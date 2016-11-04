@@ -14,8 +14,8 @@
 #include "io.h"
 #include "error_handling.h"
 
-//#define CPU_TIME
-#define OUTPUT
+#define CPU_TIME
+//#define OUTPUT
 //#define TURBULENCE
 
 int main(int argc, char *argv[])
@@ -174,19 +174,21 @@ int main(int argc, char *argv[])
     #endif //MPI_CHOLLA
     #endif
 
-
+    /*
     for (int i=G.H.n_ghost; i<G.H.nx-G.H.n_ghost; i++) {
-      for (int j=G.H.n_ghost; j<G.H.ny-G.H.n_ghost; j++) {
-        for (int k=G.H.n_ghost; k<G.H.nz-G.H.n_ghost; k++) {
+      //for (int j=G.H.n_ghost; j<G.H.ny-G.H.n_ghost; j++) {
+        //for (int k=G.H.n_ghost; k<G.H.nz-G.H.n_ghost; k++) {
+          int j, k; 
+          j = k = 8;
           int id = i + G.H.nx*j + G.H.nx*G.H.ny*k;
-          if (G.C.density[id] != G.C.density[id]) {
-              printf("%d %3d %3d\n", i, j, k);
-              chexit(0);
-          }
-        }
-      }    
+          //if (G.C.density[id] != G.C.density[id]) {
+              printf("%d %3d %3d %f\n", i, j, k, G.C.density[id]);
+              //chexit(0);
+          //}
+        //}
+      //}    
     }
-
+  */
   /*
   for (int j=0; j<G.H.ny; j++) {
     printf("%03d ", j);
