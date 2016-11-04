@@ -22,6 +22,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
   Real d, E;
   Real n, T, T_init;
   Real del_T, dt_sub;
+  Real mu; // mean molecular weight
   Real cool; //cooling rate per volume, erg/s/cm^3
   #ifndef DE
   Real vx, vy, vz, p;
@@ -29,6 +30,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
   #ifdef DE
   Real ge;
   #endif
+
+  mu = 1.0;
 
   // get a thread ID
   int blockId = blockIdx.x + blockIdx.y*gridDim.x;
@@ -58,14 +61,14 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     #endif
     
     // calculate the number density of the gas (in cgs)
-    n = d*DENSITY_UNIT / MP;
+    n = d*DENSITY_UNIT / (mu * MP);
 
     // calculate the temperature of the gas
     #ifndef DE
     T_init = p*PRESSURE_UNIT/ (n*KB);
     #endif
     #ifdef DE
-    T_init = ge*(gamma-1.0)*SP_ENERGY_UNIT*MP/KB;
+    T_init = ge*(gamma-1.0)*SP_ENERGY_UNIT*mu*MP/KB;
     #endif
 
     // calculate cooling rate per volume
@@ -101,7 +104,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     E -= n*KB*del_T / ((gamma-1.0)*ENERGY_UNIT);
     //if (E < 0.0) printf("%3d %3d %3d Negative E after cooling. %f %f %f %f %f\n", xid, yid, zid, del_T, T_init, E_old, n, E);
     #ifdef DE
-    ge -= KB*del_T / (MP*(gamma-1.0)*SP_ENERGY_UNIT);
+    ge -= KB*del_T / (mu*MP*(gamma-1.0)*SP_ENERGY_UNIT);
     //if (ge < 0.0) printf("%3d %3d %3d Negative ge after cooling. %f %f %f %f %f\n", xid, yid, zid, dev_conserved[4*n_cells + id], d*dev_conserved[5*n_cells + id], n, del_T, T_init);
     #endif
 

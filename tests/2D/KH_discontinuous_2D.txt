@@ -42,5 +42,5 @@ zu_bcnd=0
 #outdir=/data2/evan/grid_tests/KH/PPM_athena/
 #outdir=./plm_athena/
 #outdir=./binaries/
-outdir=/gsfs1/rsgrps/brant/evan/data/KH/PPMP_CTU/hdf5/
+outdir=/gsfs1/rsgrps/brant/evan/data/KH/PPMP_exact/hdf5/
 

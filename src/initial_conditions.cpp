@@ -1237,8 +1237,9 @@ void Grid3D::Cloud_3D() {
   // turbulent cloud
   FILE *fp;
   //fp = fopen("/gsfs1/rsgrps/brant/evan/data/cloud_3D/cloud.64.dat", "r");
-  //fp = fopen("/lustre/atlas/proj-shared/ast119/data/cloud_3D/cloud.128.dat", "r");
-  fp = fopen("/lustre/atlas/proj-shared/ast119/data/cloud_3D/cloud.256.dat", "r");
+  fp = fopen("/gsfs1/rsgrps/brant/evan/data/cloud_3D/cloud.128.dat", "r");
+  //fp = fopen("/gsfs1/rsgrps/brant/evan/data/cloud_3D/cloud.256.dat", "r");
+  //fp = fopen("/Users/evan/Desktop/cloud_ICs/cloud.128.dat", "r");
 
   if (fp == NULL) {
     chprintf("Can't open input file.\n");
@@ -1269,7 +1270,11 @@ void Grid3D::Cloud_3D() {
         fread(&mz, 1, sizeof(float), fp);
         // only place in cells that are in your domain
         #ifdef MPI_CHOLLA
+<<<<<<< HEAD
         ioff = 1*nx_global/16;
+=======
+        ioff = 1*nx_global/12;
+>>>>>>> 3524a9d21b98ac0e5ee416bfc1b879e5b7e990ce
         joff = 1*ny_global/3;
         koff = 1*nz_global/3;
         if (ii+ioff >= nx_local_start && ii+ioff < nx_local_start+nx_local) {
@@ -1287,6 +1292,7 @@ void Grid3D::Cloud_3D() {
 	  // radial position relative to cloud ceneter
           r = sqrt((x_pos-xcen)*(x_pos-xcen) + (y_pos-ycen)*(y_pos-ycen) + (z_pos-zcen)*(z_pos-zcen));
 
+<<<<<<< HEAD
           //scale the cloud density such that the ambient density matches (20*0.005)
           //d = 0.765*d; //n=1
           d = 0.35*d; //n=0.5
@@ -1294,6 +1300,18 @@ void Grid3D::Cloud_3D() {
 
           //only place cells within the region defined by the cloud radius
           if (r < R_c) {
+=======
+          //scale the cloud density (to achieve desired mass, density, whatever)
+          d = d_cloud*d;
+          //d = 0.765*d; //n=1
+          //d = 0.35*d; //n=0.5
+          //d = 0.145*d; //n=0.2
+          d = 0.07*d; //n=0.1
+
+          //only place cells within the region defined by the cloud radius
+          if (r < R_c) {
+          //if (r < R_max) {
+>>>>>>> 3524a9d21b98ac0e5ee416bfc1b879e5b7e990ce
             C.density[id] = d;
             if (C.density[id] < d_wind) C.density[id] = d_wind;
             C.momentum_x[id] = 0.0;
@@ -1304,6 +1322,10 @@ void Grid3D::Cloud_3D() {
             C.GasEnergy[id] = P_cloud/(gama-1.0);
             #endif
           }
+<<<<<<< HEAD
+=======
+          
+>>>>>>> 3524a9d21b98ac0e5ee416bfc1b879e5b7e990ce
           if (r > R_c && r < R_max) {
             //C.density[id] = d*exp(-5.0*fabs(r - R_c)/(R_max-R_c));
             C.density[id] = d*exp((log(d_wind/d_cloud)/(R_max-R_c))*fabs(r - R_c));
@@ -1316,6 +1338,10 @@ void Grid3D::Cloud_3D() {
             C.GasEnergy[id] = P_cloud/(gama-1.0);
             #endif
           }
+<<<<<<< HEAD
+=======
+          
+>>>>>>> 3524a9d21b98ac0e5ee416bfc1b879e5b7e990ce
         #ifdef MPI_CHOLLA
         }
         }
