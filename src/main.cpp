@@ -15,11 +15,7 @@
 #include "error_handling.h"
 
 #define CPU_TIME
-<<<<<<< HEAD
 //#define OUTPUT
-=======
-#define OUTPUT
->>>>>>> 3524a9d21b98ac0e5ee416bfc1b879e5b7e990ce
 //#define TURBULENCE
 
 int main(int argc, char *argv[])
@@ -151,14 +147,6 @@ int main(int argc, char *argv[])
     {
       G.H.dt = outtime - G.H.t;
     }
-
-    for (int i=G.H.n_ghost; i<G.H.nx-G.H.n_ghost; i++) {
-      for (int j=G.H.n_ghost; j<G.H.ny-G.H.n_ghost; j++) {
-        int id1 = i + G.H.nx*j;
-        int id2 = j + G.H.nx*i;
-        if (G.C.momentum_x[id1] != G.C.momentum_y[id2]) printf("%3d %3d\n", i, j);
-      }
-    }    
 
     // Advance the grid by one timestep
     #ifdef CPU_TIME
