@@ -32,7 +32,7 @@ zu_bcnd=1
 # path to output directory
 #outdir=/lustre/atlas/proj-shared/ast119/data/sound_wave/hdf5_8/
 outdir=./hdf5/
-#outdir=/data2/evan/grid_tests/sound_waves/z/
+outdir=/Users/evan/Desktop/output/sound_wave/
 
 #################################################
 # Parameters for linear wave problems
