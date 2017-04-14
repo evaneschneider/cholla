@@ -14,8 +14,8 @@
 #include "io.h"
 #include "error_handling.h"
 
-#define CPU_TIME
-//#define OUTPUT
+//#define CPU_TIME
+#define OUTPUT
 //#define TURBULENCE
 
 int main(int argc, char *argv[])

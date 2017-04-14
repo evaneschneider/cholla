@@ -42,8 +42,8 @@ OUTPUT = -DHDF5
 #RECONSTRUCTION = -DPPMP
 RECONSTRUCTION = -DPPMC
 
-#SOLVER = -DEXACT
-SOLVER = -DROE
+SOLVER = -DEXACT
+#SOLVER = -DROE
 #SOLVER = -DHLLC
 
 #INTEGRATOR = -DCTU 
@@ -54,13 +54,13 @@ INTEGRATOR = -DVL
 
 INCL   = -I./ -I/usr/local/cuda/include -I/usr/local/include
 NVLIBS = -L/usr/local/cuda/lib -lcuda -lcudart
-LIBS   = -L/usr/local/lib -lm -lgsl -lhdf5
+LIBS   = -L/usr/local/lib -lm -lhdf5 #-lgsl
 
 
 FLAGS = $(PRECISION) $(OUTPUT) $(RECONSTRUCTION) $(SOLVER) $(INTEGRATOR) $(COOLING) -DCUDA -DCUDA_ERROR_CHECK
 CFLAGS 	  = $(OPTIMIZE) $(FLAGS) $(MPI_FLAGS) #-m64
 CXXFLAGS  = $(OPTIMIZE) $(FLAGS) $(MPI_FLAGS) #-m64
-NVCCFLAGS = $(FLAGS) -gencode arch=compute_30,code=sm_30 -fmad=false 
+NVCCFLAGS = $(FLAGS) -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -fmad=false 
 LDFLAGS	  = -Xlinker -rpath -Xlinker /usr/local/cuda/lib #-m64 -F/Library/Frameworks -framework CUDA
 
 

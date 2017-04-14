@@ -888,6 +888,8 @@ void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
   R = H.dx; //radius of the explosion - one cell width
   P_ambient = P_r;
   P_sedov = P_l;
+  Real E_ambient = 1e-6;
+  Real E_sedov = 1.0/((4.0/3.0)*PI*H.dx*H.dx*H.dx); // total explosion energy divided by volume gives energy density
 
   istart = H.n_ghost;
   iend   = H.nx-H.n_ghost;
@@ -931,7 +933,8 @@ void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
           C.momentum_x[id] = 0.0;
           C.momentum_y[id] = 0.0;
           C.momentum_z[id] = 0.0;
-          C.Energy[id] = P_sedov/(gama-1.0);
+          //C.Energy[id] = P_sedov/(gama-1.0);
+          C.Energy[id] = E_sedov;
         }
         // outside the sphere 
         else {
@@ -939,7 +942,8 @@ void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
           C.momentum_x[id] = 0.0;
           C.momentum_y[id] = 0.0;
           C.momentum_z[id] = 0.0;
-          C.Energy[id] = P_ambient/(gama-1.0);
+          //C.Energy[id] = P_ambient/(gama-1.0);
+          C.Energy[id] = E_ambient;
         }
         // on the sphere 
         
@@ -962,8 +966,10 @@ void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
           C.momentum_x[id] = 0.0;
           C.momentum_y[id] = 0.0;
           C.momentum_z[id] = 0.0;
-          P = weight*P_sedov + (1-weight)*P_ambient;
-          C.Energy[id] = P/(gama-1.0);
+          //P = weight*P_sedov + (1-weight)*P_ambient;
+          P = weight*E_sedov + (1-weight)*E_ambient;
+          //C.Energy[id] = P/(gama-1.0);
+          C.Energy[id] = P;
         }
         
       }
