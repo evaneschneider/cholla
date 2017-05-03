@@ -9,21 +9,28 @@ CUDAFILES = $(wildcard $(DIR)/*.cu)
 
 OBJS = $(subst .c,.o,$(CFILES)) $(subst .cpp,.o,$(CPPFILES)) $(subst .cu,.o,$(CUDAFILES))
 
+
+#To use GPUs, CUDA must be turned on here
+#Optional error checking can also be enabled
+CUDA = -DCUDA -DCUDA_ERROR_CHECK
+
+
 #To use MPI, MPI_FLAGS must be set to -DMPI_CHOLLA
 #otherwise gcc/g++ will be used for serial compilation
-#MPI_FLAGS =  -DMPI_CHOLLA
+MPI_FLAGS =  -DMPI_CHOLLA
 
 ifdef MPI_FLAGS
   CC	= mpicc
   CXX = mpicxx
 
   #MPI_FLAGS += -DSLAB
-  #FFT_LIBS  += -lfftw3_mpi
-
   MPI_FLAGS += -DBLOCK
-  MPI_FLAGS += -arch x86_64
 
+else
+  CC  = cc
+  CXX = c++
 endif
+
 
 #define the NVIDIA CUDA compiler
 NVCC	= nvcc
@@ -57,11 +64,11 @@ NVLIBS = -L/usr/local/cuda/lib -lcuda -lcudart
 LIBS   = -L/usr/local/lib -lm -lhdf5 #-lgsl
 
 
-FLAGS = $(PRECISION) $(OUTPUT) $(RECONSTRUCTION) $(SOLVER) $(INTEGRATOR) $(COOLING) -DCUDA -DCUDA_ERROR_CHECK
-CFLAGS 	  = $(OPTIMIZE) $(FLAGS) $(MPI_FLAGS) #-m64
-CXXFLAGS  = $(OPTIMIZE) $(FLAGS) $(MPI_FLAGS) #-m64
-NVCCFLAGS = $(FLAGS) -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -fmad=false 
-LDFLAGS	  = -Xlinker -rpath -Xlinker /usr/local/cuda/lib #-m64 -F/Library/Frameworks -framework CUDA
+FLAGS = $(CUDA) $(PRECISION) $(OUTPUT) $(RECONSTRUCTION) $(SOLVER) $(INTEGRATOR) $(COOLING)
+CFLAGS 	  = $(OPTIMIZE) $(FLAGS) $(MPI_FLAGS)
+CXXFLAGS  = $(OPTIMIZE) $(FLAGS) $(MPI_FLAGS)
+NVCCFLAGS = $(FLAGS) -fmad=false -m64 -Xcompiler -arch -Xcompiler x86_64 -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -Wno-deprecated-gpu-targets
+ALL_LDFLAGS	 += -Xlinker -F/Library/Frameworks -Xlinker -framework -Xlinker CUDA
 
 
 %.o:	%.c
@@ -74,7 +81,7 @@ LDFLAGS	  = -Xlinker -rpath -Xlinker /usr/local/cuda/lib #-m64 -F/Library/Framew
 		$(NVCC) $(NVCCFLAGS)  $(INCL)  -c $< -o $@ 
 
 $(EXEC): $(OBJS) 
-	 	 $(CXX) $(LDFLAGS) $(OBJS) $(LIBS) $(NVLIBS) -o $(EXEC) $(INCL) 
+	 	 $(CXX) $(OBJS) $(LIBS) $(NVLIBS) -o $(EXEC) $(INCL) $(ALL_LDFLAGS)
 
 #$(OBJS): $(INCL) 
 

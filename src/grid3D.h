@@ -316,9 +316,9 @@ class Grid3D
      *  \brief Noh test described in Stone, 2008. */
     void Noh_3D();
 
-    /*! \fn void Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
+    /*! \fn void Sedov_Taylor()
      *  \brief Sedov Taylor blast wave test. */
-    void Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r);
+    void Sedov_Taylor();
 
     /*! \fn void Turbulent_Slab()
      *  \brief Turbulent slab in a hot diffuse wind. */

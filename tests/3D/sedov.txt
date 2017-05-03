@@ -10,12 +10,12 @@ ny=64
 # number of grid cells in the z dimension
 nz=64
 # final output time
-tout=0.84
+tout=0.06
 # time interval for output
 outstep=0.006
 # name of initial conditions
-#init=Sedov_Taylor
-init=Read_Grid
+init=Sedov_Taylor
+#init=Read_Grid
 nfile=100
 # domain properties
 xmin=0.0
@@ -32,17 +32,10 @@ yu_bcnd=3
 zl_bcnd=2
 zu_bcnd=3
 # path to output directory
-outdir=/Volumes/data1/evan/data/Sedov_Taylor/hdf5/
+#outdir=/Volumes/data1/evan/data/Sedov_Taylor/hdf5/
+outdir=/Users/evan/Desktop/data/Sedov_Taylor/hdf5/
 
 #################################################
-# density of left state
-rho_l=1.0
-# pressure of left state (Sedov explosion pressure)
-P_l=1273240
-# density of right state
-rho_r=1.0
-# pressure of right state (ambient pressure)
-P_r=0.00001
 # value of gamma
 gamma=1.666666666667
 

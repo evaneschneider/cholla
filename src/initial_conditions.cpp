@@ -51,7 +51,7 @@ void Grid3D::Set_Initial_Conditions(parameters P, Real C_cfl) {
   } else if (strcmp(P.init, "Noh_3D")==0) {
     Noh_3D();    
   } else if (strcmp(P.init, "Sedov_Taylor")==0) {
-    Sedov_Taylor(P.rho_l, P.P_l, P.rho_r, P.P_r);
+    Sedov_Taylor();
   } else if (strcmp(P.init, "Turbulent_Slab")==0) {
     Turbulent_Slab();
   } else if (strcmp(P.init, "Cloud_3D")==0) {
@@ -875,21 +875,20 @@ void Grid3D::Noh_3D()
 
 
 
-/*! \fn void Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
+/*! \fn void Sedov_Taylor()
  *  \brief Sedov_Taylor blast wave test. */
-void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
+void Grid3D::Sedov_Taylor()
 {
   int i, j, k, id;
   int istart, jstart, kstart, iend, jend, kend;
   Real x_pos, y_pos, z_pos;
-  Real rsq, R, P, P_ambient, P_sedov;
-  Real weight, xpoint, ypoint, zpoint;
+  Real rsq, R, d, E, E_ambient, E_sedov;
   int incount, ii;
-  R = H.dx; //radius of the explosion - one cell width
-  P_ambient = P_r;
-  P_sedov = P_l;
-  Real E_ambient = 1e-6;
-  Real E_sedov = 1.0/((4.0/3.0)*PI*H.dx*H.dx*H.dx); // total explosion energy divided by volume gives energy density
+  Real weight, xpoint, ypoint, zpoint;
+  R = H.dx; // radius of the explosion - one cell width
+  d = 1.0; // initial density
+  E_ambient = 1e-6; // energy outside the explosion radius
+  E_sedov = 1.0/((4.0/3.0)*PI*H.dx*H.dx*H.dx); // total explosion energy divided by volume gives energy density
 
   istart = H.n_ghost;
   iend   = H.nx-H.n_ghost;
@@ -927,26 +926,23 @@ void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
         if (H.nz > 1) rsq += z_pos*z_pos;
         
 
-        // inside the sphere 
+        // cell center inside the sphere 
         if (rsq < R*R) {
-          C.density[id] = rho_l;
+          C.density[id] = d;
           C.momentum_x[id] = 0.0;
           C.momentum_y[id] = 0.0;
           C.momentum_z[id] = 0.0;
-          //C.Energy[id] = P_sedov/(gama-1.0);
           C.Energy[id] = E_sedov;
         }
-        // outside the sphere 
+        // cell center outside the sphere 
         else {
-          C.density[id] = rho_r;
+          C.density[id] = d;
           C.momentum_x[id] = 0.0;
           C.momentum_y[id] = 0.0;
           C.momentum_z[id] = 0.0;
-          //C.Energy[id] = P_ambient/(gama-1.0);
           C.Energy[id] = E_ambient;
         }
-        // on the sphere 
-        
+        // weight energies cells for cells on the sphere 
         if ((x_pos-0.5*H.dx)*(x_pos-0.5*H.dx) + (y_pos-0.5*H.dy)*(y_pos-0.5*H.dy) + (z_pos-0.5*H.dz)*(z_pos-0.5*H.dz) < R*R && (x_pos+0.5*H.dx)*(x_pos+0.5*H.dx) + (y_pos+0.5*H.dy)*(y_pos+0.5*H.dy) + (z_pos+0.5*H.dz)*(z_pos+0.5*H.dz) > R*R) {
           // quick Monte Carlo to determine weighting
           Ran quickran(time(NULL));
@@ -962,14 +958,8 @@ void Grid3D::Sedov_Taylor(Real rho_l, Real P_l, Real rho_r, Real P_r)
             if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R*R) incount++;
           }
           weight = incount / 1000.0;
-          C.density[id] = rho_l;
-          C.momentum_x[id] = 0.0;
-          C.momentum_y[id] = 0.0;
-          C.momentum_z[id] = 0.0;
-          //P = weight*P_sedov + (1-weight)*P_ambient;
-          P = weight*E_sedov + (1-weight)*E_ambient;
-          //C.Energy[id] = P/(gama-1.0);
-          C.Energy[id] = P;
+          E = weight*E_sedov + (1-weight)*E_ambient;
+          C.Energy[id] = E;
         }
         
       }
