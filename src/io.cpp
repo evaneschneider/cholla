@@ -2069,6 +2069,28 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id)
     memcpy(&(C.GasEnergy[id]), &dataset_buffer[0], H.nx_real*sizeof(Real));    
     #endif
 
+    #ifdef SCALAR
+    for (int s=0; s<NSCALARS; s++) {
+      // create the name of the dataset
+      char dataset[100]; 
+      char number[10];
+      strcpy(dataset, "/scalar"); 
+      sprintf(number, "%d", s);
+      strcat(dataset,number);        
+    
+      // Open the passive scalar dataset
+      dataset_id = H5Dopen(file_id, dataset, H5P_DEFAULT);
+      // Read the scalar array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      // Free the dataset id
+      status = H5Dclose(dataset_id);
+
+      // Copy the scalar array to the grid 
+      id = H.n_ghost;
+      memcpy(&(C.Scalar[id + s*H.n_cells]), &dataset_buffer[0], H.nx_real*sizeof(Real));    
+    }
+    #endif
+
   }
 
 
@@ -2180,6 +2202,34 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id)
         C.GasEnergy[id] = dataset_buffer[buf_id];
       }
     }    
+    #endif
+
+
+    #ifdef SCALAR
+    for (int s=0; s<NSCALARS; s++) {
+      // create the name of the dataset
+      char dataset[100]; 
+      char number[10];
+      strcpy(dataset, "/scalar"); 
+      sprintf(number, "%d", s);
+      strcat(dataset,number);        
+
+      // Open the scalar dataset
+      dataset_id = H5Dopen(file_id, dataset, H5P_DEFAULT);
+      // Read the scalar array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      // Free the dataset id
+      status = H5Dclose(dataset_id);
+
+      // Copy the scalar array to the grid 
+      for (j=0; j<H.ny_real; j++) {
+        for (i=0; i<H.nx_real; i++) {
+          id = (i+H.n_ghost) + (j+H.n_ghost)*H.nx;
+          buf_id = j + i*H.ny_real;
+          C.Scalar[id+s*H.n_cells] = dataset_buffer[buf_id];
+        }
+      }    
+    }
     #endif
 
   }
@@ -2306,6 +2356,34 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id)
     }    
     #endif
 
+    #ifdef SCALAR
+    for (int s=0; s<NSCALARS; s++) {
+      // create the name of the dataset
+      char dataset[100]; 
+      char number[10];
+      strcpy(dataset, "/scalar"); 
+      sprintf(number, "%d", s);
+      strcat(dataset,number);        
+
+      // Open the scalar dataset
+      dataset_id = H5Dopen(file_id, dataset, H5P_DEFAULT);
+      // Read the scalar array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      // Free the dataset id
+      status = H5Dclose(dataset_id);
+
+      // Copy the scalar array to the grid 
+      for (k=0; k<H.nz_real; k++) {
+        for (j=0; j<H.ny_real; j++) {
+          for (i=0; i<H.nx_real; i++) {
+            id = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+            buf_id = k + j*H.nz_real + i*H.nz_real*H.ny_real;
+            C.Scalar[id+s*H.n_cells] = dataset_buffer[buf_id];
+          }
+        }
+      }    
+    }
+    #endif
   }
   free(dataset_buffer);
 
