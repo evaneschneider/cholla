@@ -550,6 +550,7 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
   // Close the dataspace
   status = H5Sclose(dataspace_id);
 
+
 }
 #endif
 
@@ -1086,13 +1087,10 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
   Real      *dataset_buffer_dxy, *dataset_buffer_dxz;
   Real      *dataset_buffer_Txy, *dataset_buffer_Txz;
   herr_t    status;
-  Real dxy, dxz, Txy, Txz, d, n, T;
-  #ifndef DE
-  Real mx, my, mz, E, P;
-  mx = my = mz = E = P = 0.0;
-  #endif
+  Real dxy, dxz, Txy, Txz, n, T;
 
-  d = n = T = 0;
+
+  n = T = 0;
   Real mu = 0.6;
 
   // 3D 
@@ -1122,23 +1120,15 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
         // for each xy element, sum over the z column
         for (k=0; k<H.nz_real; k++) {
           id = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-          d  = C.density[id];
           // sum density
-          dxy += d*H.dz;
+          dxy += C.density[id]*H.dz;
           // calculate number density
-          n = d*DENSITY_UNIT/(mu*MP);
+          n = C.density[id]*DENSITY_UNIT/(mu*MP);
           // calculate temperature
           #ifdef DE
           T = C.GasEnergy[id]*PRESSURE_UNIT*(gama-1.0) / (n*KB);
-          #else
-          mx = C.momentum_x[id];
-          my = C.momentum_y[id];
-          mz = C.momentum_z[id];
-          E  = C.Energy[id];
-          P = (E - 0.5*(mx*mx+my*my+mz*mz)/d)/(gama-1.0);
-          T  = P*PRESSURE_UNIT / (n*KB);
           #endif
-          Txy += T*d*H.dz;
+          Txy += T*C.density[id]*H.dz;
         }
         buf_id = j + i*H.ny_real;
         dataset_buffer_dxy[buf_id] = dxy;
@@ -1154,23 +1144,15 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
         // for each xz element, sum over the y column
         for (j=0; j<H.ny_real; j++) {
           id = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-          d  = C.density[id];
           // sum density
-          dxz += d*H.dy;
+          dxz += C.density[id]*H.dy;
           // calculate number density
-          n = d*DENSITY_UNIT/(mu*MP);
+          n = C.density[id]*DENSITY_UNIT/(mu*MP);
           // calculate temperature
           #ifdef DE
           T = C.GasEnergy[id]*PRESSURE_UNIT*(gama-1.0) / (n*KB);
-          #else
-          mx = C.momentum_x[id];
-          my = C.momentum_y[id];
-          mz = C.momentum_z[id];
-          E  = C.Energy[id];
-          P = (E - 0.5*(mx*mx+my*my+mz*mz)/d)/(gama-1.0);
-          T  = P*PRESSURE_UNIT / (n*KB);
           #endif
-          Txz += T*d*H.dy;
+          Txz += T*C.density[id]*H.dy;
         }
         buf_id = k + i*H.nz_real;
         dataset_buffer_dxz[buf_id] = dxz;
@@ -1228,21 +1210,18 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
 void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
 {
   int i, j, k, id, buf_id;
+  hsize_t   attr_dims;
+  hid_t     attribute_id, dataspace_id;
   hid_t     dataset_id, dataspace_xzr_id;
   Real      *dataset_buffer_dxzr;
   Real      *dataset_buffer_Txzr;
   Real      *dataset_buffer_vxxzr;
   Real      *dataset_buffer_vyxzr;
   Real      *dataset_buffer_vzxzr;
-  hid_t     attribute_id, dataspace_id;
-  hsize_t   attr_dims;
 
   herr_t    status;
   Real d, dxy, dxz, Txy, Txz, n, T;
-  Real mx, my, mz;
-  #ifndef DE
-  Real P, E;
-  #endif
+  Real vx, vy, vz;
 
   Real x, y, z;     //cell positions
   Real xp, yp, zp;  //rotated positions
@@ -1319,19 +1298,19 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
           beta  = (R.nz*(zp+0.5*R.Lz)/R.Lz);
           ix = (int) round(alpha);
           iz = (int) round(beta);
-          nx_min = fmin(ix, nx_min);
-          nx_max = fmax(ix, nx_max);
-          nz_min = fmin(iz, nz_min);
-          nz_max = fmax(iz, nz_max);
+          nx_min = (int) fmin(ix, nx_min);
+          nx_max = (int) fmax(ix, nx_max);
+          nz_min = (int) fmin(iz, nz_min);
+          nz_max = (int) fmax(iz, nz_max);
         }
       }
     }
     // if the corners aren't within the chosen projection area
     // take the input projection edge as the edge of this piece of the projection
-    nx_min = fmax(nx_min, 0);
-    nx_max = fmin(nx_max, R.nx);
-    nz_min = fmax(nz_min, 0);
-    nz_max = fmin(nz_max, R.nz);
+    nx_min = (int) fmax(nx_min, 0);
+    nx_max = (int) fmin(nx_max, R.nx);
+    nz_min = (int) fmax(nz_min, 0);
+    nz_max = (int) fmin(nz_max, R.nz);
 
     // add this info to the header
     attr_dims = 1;
@@ -1362,9 +1341,9 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
     // and initialize to zero
     dataset_buffer_dxzr  = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
     dataset_buffer_Txzr  = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
-    //dataset_buffer_vxxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
-    //dataset_buffer_vyxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
-    //dataset_buffer_vzxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
+    dataset_buffer_vxxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
+    dataset_buffer_vyxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
+    dataset_buffer_vzxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
 
     // Create the data space for the datasets
     dims[0] = nx_dset;
@@ -1410,27 +1389,22 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
             buf_id = iz + ix*nz_dset;
             d = C.density[id];
             dataset_buffer_dxzr[buf_id] += d*H.dy;
-            //compute velocities
-            /*
-            mx = C.momentum_x[id];
-            dataset_buffer_vxxzr[buf_id] += mx*H.dy;
-            my = C.momentum_y[id];
-            dataset_buffer_vyxzr[buf_id] += my*H.dy;
-            mz = C.momentum_z[id];
-            dataset_buffer_vzxzr[buf_id] += mz*H.dy;
-            */
             // calculate number density
             n = d*DENSITY_UNIT/(mu*MP);
             // calculate temperature
             #ifdef DE
             T = C.GasEnergy[id]*PRESSURE_UNIT*(gama-1.0) / (n*KB);
-            #else
-            E  = C.Energy[id];
-            P = (E - 0.5*(mx*mx+my*my+mz*mz)/d)/(gama-1.0);
-            T  = P*PRESSURE_UNIT / (n*KB);
             #endif
             Txz = T*d*H.dy;
             dataset_buffer_Txzr[buf_id] += Txz;
+
+            //compute velocities
+            vx = C.momentum_x[id];
+            dataset_buffer_vxxzr[buf_id] += vx*H.dy;
+            vy = C.momentum_y[id];
+            dataset_buffer_vyxzr[buf_id] += vy*H.dy;
+            vz = C.momentum_z[id];
+            dataset_buffer_vzxzr[buf_id] += vz*H.dy;
           }
         }
       }
@@ -1451,7 +1425,7 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
-/*
+
     // Create a dataset id for projected xz density
     dataset_id = H5Dcreate(file_id, "/vx_xzr", H5T_IEEE_F64BE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
@@ -1472,19 +1446,19 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
     status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vzxzr); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
-*/
 
     // Free the dataspace id
     status = H5Sclose(dataspace_xzr_id);
+
   }
   else printf("Rotated projection write only implemented for 3D data.\n");
 
   //free the data
   free(dataset_buffer_dxzr);
   free(dataset_buffer_Txzr);
-  //free(dataset_buffer_vxxzr);
-  //free(dataset_buffer_vyxzr);
-  //free(dataset_buffer_vzxzr);
+  free(dataset_buffer_vxxzr);
+  free(dataset_buffer_vyxzr);
+  free(dataset_buffer_vzxzr);
 
 }
 #endif //HDF5
