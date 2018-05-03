@@ -859,9 +859,6 @@ void average_cell(Real *C1, int i, int j, int k, int nx, int ny, int nz, int n_c
   C1[id+5*n_cells] = d_av*C_av;
   #endif
 
-<<<<<<< HEAD
-  Real n = d_av*DENSITY_UNIT/(0.6*MP);
-=======
   
   /*
   Real d_diff = 1.0e6 - C1[id];

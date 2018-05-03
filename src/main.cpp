@@ -47,9 +47,10 @@ int main(int argc, char *argv[])
   int nfile = 0; // number of output files
   Real outtime = 0; // current output time
 
-  // SN timing variables
+  // SN variables
   Real dt_SN = 100.0; // time between SN (code units)
   Real t_SN_next = 0.0;
+  Real sn_dti; // inverse time step from supernova energy input
 
   // read in command line arguments
   if (argc != 2)
@@ -140,12 +141,12 @@ int main(int argc, char *argv[])
     }
 
     // Add supernovae
-    //Real sn_dti = G.Add_Supernovae_CC85();
-    //Real sn_dti = G.Add_Supernovae();
+    //sn_dti = G.Add_Supernovae_CC85();
+    //sn_dti = G.Add_Supernovae();
 
     if (G.H.t >= t_SN_next) {
      
-      Real sn_dti = G.Add_Supernova();
+      sn_dti = G.Add_Supernova();
       t_SN_next += dt_SN;
     }
 
