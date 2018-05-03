@@ -173,6 +173,14 @@ void Grid3D::Initialize(struct parameters *P)
   R.nx = P->nxr;
   //z-dir pixels in projection
   R.nz = P->nzr;
+  //minimum x location to project
+  R.nx_min = 0;
+  //minimum z location to project
+  R.nz_min = 0;
+  //maximum x location to project
+  R.nx_max = R.nx;
+  //maximum z location to project
+  R.nz_max = R.nz;
   //rotation angle about z direction
   R.delta = M_PI*(P->delta/180.); //convert to radians
   //rotation angle about x direction
@@ -746,8 +754,8 @@ Real Grid3D::Add_Supernovae(void)
 
         // within cluster radius, inject mass and thermal energy
         // entire cell is within sphere
-        //if (rr < R_c) {
-        if (r < R_c) {
+        if (rr < R_c) {
+        //if (r < R_c) {
           C.density[id] += rho_dot * H.dt;
           C.Energy[id] += Ed_dot * H.dt;
           #ifdef DE
@@ -760,7 +768,6 @@ Real Grid3D::Add_Supernovae(void)
           //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
         }
         // on the sphere
-        /*
         if (rl < R_c && rr > R_c) {
           // quick Monte Carlo to determine weighting
           Ran quickran(50);
@@ -780,14 +787,13 @@ Real Grid3D::Add_Supernovae(void)
           C.Energy[id]  += Ed_dot * H.dt * weight;
           #ifdef DE
           C.GasEnergy[id] += Ed_dot * H.dt * weight;
-                  //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
           //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
           //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
           #endif
           //M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
           //E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
         }
-        */
         // recalculate the timestep for these cells
         d_inv = 1.0 / C.density[id];
         vx = d_inv * C.momentum_x[id];
@@ -842,10 +848,10 @@ Real Grid3D::Add_Supernovae_CC85(void)
   max_dti = max_vx = max_vy = max_vz = 0.0;
   R_s = 0.3; // starburst radius, in kpc
   // High res adiabatic params
-  //M1 = 1.5e3; 
-  //E1 = 1.5e42;
-  //M2 = 12.0e3;
-  //E2 = 5.4e42;
+  M1 = 1.5e3; 
+  E1 = 1.5e42;
+  M2 = 12.0e3;
+  E2 = 5.4e42;
   M_dot = 0.0;
   E_dot = 0.0;
 
@@ -986,7 +992,7 @@ Real Grid3D::Add_Supernovae_CC85(void)
   max_dti = fmax(max_dti, max_vy / H.dy);
   max_dti = fmax(max_dti, max_vz / H.dy);
 
-  }
+  } // t > 0
 
   return max_dti;
 
