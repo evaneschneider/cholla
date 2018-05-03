@@ -550,6 +550,7 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
   // Close the dataspace
   status = H5Sclose(dataspace_id);
 
+
 }
 #endif
 
@@ -1209,6 +1210,8 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
 void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
 {
   int i, j, k, id, buf_id;
+  hsize_t   attr_dims;
+  hid_t     attribute_id, dataspace_id;
   hid_t     dataset_id, dataspace_xzr_id;
   Real      *dataset_buffer_dxzr;
   Real      *dataset_buffer_Txzr;
@@ -1268,14 +1271,74 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
   // 3D 
   if (H.nx>1 && H.ny>1 && H.nz>1) {
 
-    int       nx_dset = R.nx;
-    int       nz_dset = R.nz;
     Real      Lx = R.Lx; //projected box size in x dir
     Real      Lz = R.Lz; //projected box size in z dir
+    int nx_dset = R.nx;
+    int nz_dset = R.nz;
+
+    // determine the size of the projection to output for this subvolume
+    #ifdef MPI_CHOLLA
+    int nx_min, nz_min, nx_max, nz_max;
+    nx_min = R.nx;
+    nx_max = 0;
+    nz_min = R.nz;
+    nz_max = 0;
+    for (i=0; i<2; i++) {
+      for (j=0; j<2; j++) {
+        for (k=0; k<2; k++) {
+          // find the corners of this domain in the rotated position
+          Get_Position(H.n_ghost+i*(H.nx-2*H.n_ghost), H.n_ghost+j*(H.ny-2*H.n_ghost), H.n_ghost+k*(H.nz-2*H.n_ghost), &x, &y, &z);
+          // rotate cell position
+          xp = a00*x + a01*y + a02*z;
+          yp = a10*x + a11*y + a12*z;
+          zp = a20*x + a21*y + a22*z;
+          //find projected location
+          //assumes box centered at [0,0,0]
+          alpha = (R.nx*(xp+0.5*R.Lx)/R.Lx);
+          beta  = (R.nz*(zp+0.5*R.Lz)/R.Lz);
+          ix = (int) round(alpha);
+          iz = (int) round(beta);
+          nx_min = (int) fmin(ix, nx_min);
+          nx_max = (int) fmax(ix, nx_max);
+          nz_min = (int) fmin(iz, nz_min);
+          nz_max = (int) fmax(iz, nz_max);
+        }
+      }
+    }
+    // if the corners aren't within the chosen projection area
+    // take the input projection edge as the edge of this piece of the projection
+    nx_min = (int) fmax(nx_min, 0);
+    nx_max = (int) fmin(nx_max, R.nx);
+    nz_min = (int) fmax(nz_min, 0);
+    nz_max = (int) fmin(nz_max, R.nz);
+
+    // add this info to the header
+    attr_dims = 1;
+    dataspace_id = H5Screate_simple(1, &attr_dims, NULL);
+    attribute_id = H5Acreate(file_id, "nx_min", H5T_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+    status = H5Awrite(attribute_id, H5T_NATIVE_INT, &nx_min);
+    status = H5Aclose(attribute_id);
+    attribute_id = H5Acreate(file_id, "nz_min", H5T_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+    status = H5Awrite(attribute_id, H5T_NATIVE_INT, &nz_min);
+    status = H5Aclose(attribute_id);
+    attribute_id = H5Acreate(file_id, "nx_max", H5T_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+    status = H5Awrite(attribute_id, H5T_NATIVE_INT, &nx_max);
+    status = H5Aclose(attribute_id);
+    attribute_id = H5Acreate(file_id, "nz_max", H5T_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+    status = H5Awrite(attribute_id, H5T_NATIVE_INT, &nz_max);
+    status = H5Aclose(attribute_id);
+    status = H5Sclose(dataspace_id);
+
+    // set the projected dataset size for this process to capture
+    // this piece of the simulation volume
+    nx_dset = nx_max-nx_min;
+    nz_dset = nz_max-nz_min;
+    #endif //MPI_CHOLLA
 
     hsize_t   dims[2];
 
-    //allocate and initialize zero
+    // allocate the buffers for the projected dataset
+    // and initialize to zero
     dataset_buffer_dxzr  = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
     dataset_buffer_Txzr  = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
     dataset_buffer_vxxzr = (Real *) calloc(nx_dset*nz_dset,sizeof(Real));
@@ -1311,10 +1374,14 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
 
           //find projected locations
           //assumes box centered at [0,0,0]
-          alpha = (nx_dset*(xp+0.5*Lx)/Lx);
-          beta  = (nz_dset*(zp+0.5*Lz)/Lz);
+          alpha = (R.nx*(xp+0.5*R.Lx)/R.Lx);
+          beta  = (R.nz*(zp+0.5*R.Lz)/R.Lz);
           ix = (int) round(alpha);
           iz = (int) round(beta);
+          #ifdef MPI_CHOLLA
+          ix = ix - nx_min;
+          iz = iz - nz_min;
+          #endif
 
           //project density
           if((ix>=0)&&(ix<nx_dset)&&(iz>=0)&&(iz<nz_dset))

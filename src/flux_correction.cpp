@@ -57,53 +57,23 @@ void Flux_Correction_3D(Real *C1, Real *C2, int nx, int ny, int nz, int x_off, i
         vy_new = C2[2*n_cells+id]/d_new;
         vz_new = C2[3*n_cells+id]/d_new;
         P_new = (E_new - 0.5*d_new*(vx_new*vx_new + vy_new*vy_new + vz_new*vz_new))*(gama-1.0);
-        n = d_new*DENSITY_UNIT/(1.27*MP);
+        n = d_new*DENSITY_UNIT/(0.6*MP);
+        //n = d_new*DENSITY_UNIT/(1.27*MP);
         #ifdef DE
         T = C2[(nfields-1)*n_cells+id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+        #else
+        T = P_new*PRESSURE_UNIT/(n*KB);
         #endif
   
         // if there is a problem, redo the update for that cell using first-order fluxes
-        if (d_new < 0.0 || d_new != d_new || P_new < 0.0 || P_new != P_new || E_new < 0.0 || E_new != E_new) {
+        if (d_new < 0.0 || d_new != d_new || P_new < 0.0 || P_new != P_new || E_new < 0.0 || E_new != E_new || T > 1.0e9) {
+        //if (d_new < 0.0 || d_new != d_new || P_new < 0.0 || P_new != P_new || E_new < 0.0 || E_new != E_new) {
           printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d_new, E_new, P_new, T);
           //printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  T:%e\n", i, j, k, d_new, E_new, P_new, T);
 
-          /*
-          // Do a half-step first order update for the affected cell and all surrounding cells
-          // arrays to hold half-step conserved values
-          Real C_i[nfields];
-          Real C_imo[nfields];
-          Real C_imt[nfields];
-          Real C_ipo[nfields];
-          Real C_ipt[nfields];
-          Real C_jmo[nfields];
-          Real C_jmt[nfields];
-          Real C_jpo[nfields];
-          Real C_jpt[nfields];
-          Real C_kmo[nfields];
-          Real C_kmt[nfields];
-          Real C_kpo[nfields];
-          Real C_kpt[nfields];
-
-          first_order_update(C1, C_i, i, j, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_imo, i-1, j, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_imt, i-2, j, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_ipo, i+1, j, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_ipt, i+2, j, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_jmo, i, j-1, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_jmt, i, j-2, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_jpo, i, j+1, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_jpt, i, j+2, k, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_kmo, i, j, k-1, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_kmt, i, j, k-2, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_kpo, i, j, k+1, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-          first_order_update(C1, C_kpt, i, j, k+2, 0.5*dtodx, 0.5*dtody, 0.5*dtodz, nfields, nx, ny, nz, n_cells);
-
-          // Use the half step values of the conserved variables to calculate the second-order fluxes
-          // and subtract these from each neighbor cell
-          second_order_fluxes(C1, C2, C_i, C_imo, C_imt, C_ipo, C_ipt, C_jmo, C_jmt, C_jpo, C_jpt, C_kmo, C_kmt, C_kpo, C_kpt, i, j, k, dx, dy, dz, dt, nfields, nx, ny, nz, n_cells);
-
-          // Now update the conserved variables for the affected cell and neighbors 
-          // using the first-order fluxes
+/*
+          // Update the conserved variables for the affected cell 
+          // using first-order fluxes (nonconservative update)
           first_order_fluxes(C1, C2, i, j, k, dtodx, dtody, dtodz, nfields, nx, ny, nz, n_cells);
 
           // Reset with the new values of the conserved variables
@@ -114,12 +84,16 @@ void Flux_Correction_3D(Real *C1, Real *C2, int nx, int ny, int nz, int x_off, i
           vz_new = C2[3*n_cells+id]/d_new;
           P_new = (E_new - 0.5*d_new*(vx_new*vx_new + vy_new*vy_new + vz_new*vz_new))*(gama-1.0);
           n = d_new*DENSITY_UNIT/(0.6*MP);
+          #ifdef DE
           T = C2[5*n_cells+id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          */
+          #else
+          T = P_new*PRESSURE_UNIT/(n*KB);
+          #endif
 
           // if there is STILL a problem, average over surrounding cells
-          //if (d_new < 0.0 || d_new != d_new || P_new < 0.0 || P_new != P_new || E_new < 0.0 || E_new != E_new || T > 1.0e9) {
-          //  printf("%3d %3d %3d Averaging: d: %e  E:%e  P:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d_new, E_new, P_new, T);
+          if (d_new < 0.0 || d_new != d_new || P_new < 0.0 || P_new != P_new || E_new < 0.0 || E_new != E_new || T > 1.0e9) {
+            printf("%3d %3d %3d Averaging: d: %e  E:%e  P:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d_new, E_new, P_new, T);
+*/
           average_cell(C2, i, j, k, nx, ny, nz, n_cells, nfields);
           d_new = C2[id];
           E_new = C2[4*n_cells+id];
@@ -127,9 +101,12 @@ void Flux_Correction_3D(Real *C1, Real *C2, int nx, int ny, int nz, int x_off, i
           vy_new = C2[2*n_cells+id]/d_new;
           vz_new = C2[3*n_cells+id]/d_new;
           P_new = (E_new - 0.5*d_new*(vx_new*vx_new + vy_new*vy_new + vz_new*vz_new))*(gama-1.0);
-          n = d_new*DENSITY_UNIT/(1.27*MP);
+          n = d_new*DENSITY_UNIT/(0.6*MP);
+          //n = d_new*DENSITY_UNIT/(1.27*MP);
           #ifdef DE
           T = C2[(nfields-1)*n_cells+id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+          #else
+          T = P_new*PRESSURE_UNIT/(n*KB);
           #endif
           //}
 
@@ -882,6 +859,9 @@ void average_cell(Real *C1, int i, int j, int k, int nx, int ny, int nz, int n_c
   C1[id+5*n_cells] = d_av*C_av;
   #endif
 
+<<<<<<< HEAD
+  Real n = d_av*DENSITY_UNIT/(0.6*MP);
+=======
   
   /*
   Real d_diff = 1.0e6 - C1[id];
@@ -989,7 +969,8 @@ void average_cell(Real *C1, int i, int j, int k, int nx, int ny, int nz, int n_c
   //C1[id+5*n_cells] = P_av/(gama-1.0);
   #endif
   */
-  Real n = d_av*DENSITY_UNIT/(1.27*MP);
+  Real n = d_av*DENSITY_UNIT/(0.6*MP);
+  //Real n = d_av*DENSITY_UNIT/(1.27*MP);
   Real T = P_av*PRESSURE_UNIT/(n*KB);
   if (T < 1.0e1) {
     P_av = n*KB*1.0e1/PRESSURE_UNIT;
@@ -1000,7 +981,7 @@ void average_cell(Real *C1, int i, int j, int k, int nx, int ny, int nz, int n_c
   T = C1[id+(n_fields-1)*n_cells]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
   #endif
 
-  printf("%3d %3d %3d  d_i: %e vx_i: %e vy_i: %e vz_i: %e E: %e n_i: %e T_i: %e\n", i, j, k, d_av, vx_av, vy_av, vz_av, C1[id+4*n_cells], n, T);
+  //printf("%3d %3d %3d  d_i: %e vx_i: %e vy_i: %e vz_i: %e E: %e n_i: %e T_i: %e\n", i, j, k, d_av, vx_av, vy_av, vz_av, C1[id+4*n_cells], n, T);
   //printf("%3d %3d %3d  d_i: %e d_imo: %e d_ipo: %e d_jmo: %e d_jpo: %e d_kmo: %e d_kpo: %e\n", i, j, k, C1[id], C1[imo], C1[ipo], C1[jmo], C1[jpo], C1[kmo], C1[kpo]);
 
 }
@@ -1131,6 +1112,7 @@ void first_order_fluxes(Real *C1, Real *C2, int i, int j, int k, Real dtodx, Rea
                    + 0.5*P*(dtodx*(vx_imo-vx_ipo) + dtody*(vy_jmo-vy_jpo) + dtodz*(vz_kmo-vz_kpo));
   #endif
 
+/*
   // Correct the values of the conserved variables for the surrounding cells 
   // using the relevant first-order fluxes
   // Cell i-1
@@ -1187,7 +1169,8 @@ void first_order_fluxes(Real *C1, Real *C2, int i, int j, int k, Real dtodx, Rea
   #ifdef DE
   C2[kpo+5*n_cells] += dtodz*(F_Ry[5]);
   #endif  
-  printf("%3d %3d %3d  d: %e d_imo: %e d_ipo: %e d_jmo: %e d_jpo: %e d_kmo: %e d_kpo: %e\n", i, j, k, C2[id], C2[imo], C2[ipo], C2[jmo], C2[jpo], C2[kmo], C2[kpo]);
+*/
+  //printf("%3d %3d %3d  d: %e d_imo: %e d_ipo: %e d_jmo: %e d_jpo: %e d_kmo: %e d_kpo: %e\n", i, j, k, C2[id], C2[imo], C2[ipo], C2[jmo], C2[jpo], C2[kmo], C2[kpo]);
 }
 
 
@@ -1431,7 +1414,8 @@ void cooling_CPU(Real *C2, int id, int n_cells, Real dt) {
   // calculate final temperature
   T -= del_T;
 
-  //T = fmax(T, T_min);
+  // set a temperature floor
+  T = fmax(T, T_min);
 
   // adjust value of energy based on total change in temperature
   del_T = T_init - T; // total change in T
