@@ -2087,7 +2087,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id)
 
       // Copy the scalar array to the grid 
       id = H.n_ghost;
-      memcpy(&(C.Scalar[id + s*H.n_cells]), &dataset_buffer[0], H.nx_real*sizeof(Real));    
+      memcpy(&(C.scalar[id + s*H.n_cells]), &dataset_buffer[0], H.nx_real*sizeof(Real));    
     }
     #endif
 
@@ -2226,7 +2226,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id)
         for (i=0; i<H.nx_real; i++) {
           id = (i+H.n_ghost) + (j+H.n_ghost)*H.nx;
           buf_id = j + i*H.ny_real;
-          C.Scalar[id+s*H.n_cells] = dataset_buffer[buf_id];
+          C.scalar[id+s*H.n_cells] = dataset_buffer[buf_id];
         }
       }    
     }
@@ -2378,7 +2378,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id)
           for (i=0; i<H.nx_real; i++) {
             id = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
             buf_id = k + j*H.nz_real + i*H.nz_real*H.ny_real;
-            C.Scalar[id+s*H.n_cells] = dataset_buffer[buf_id];
+            C.scalar[id+s*H.n_cells] = dataset_buffer[buf_id];
           }
         }
       }    
