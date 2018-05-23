@@ -53,6 +53,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
   Real ge;
   #endif
   Real T_min = 1.0e4; // minimum temperature allowed
+  Real T_max = 1.0e9; // minimum temperature allowed
 
   mu = 0.6;
   //mu = 1.27;
@@ -104,10 +105,10 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
 
     // calculate cooling rate per volume
     T = T_init;
-    //if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
+    if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
     // call the cooling function
-    //cool = CIE_cool(n, T); 
-    cool = Cloudy_cool(n, T); 
+    cool = CIE_cool(n, T); 
+    //cool = Cloudy_cool(n, T); 
     
     // calculate change in temperature given dt
     del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
@@ -121,8 +122,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
       // how much time is left from the original timestep?
       dt -= dt_sub;
       // calculate cooling again
-      //cool = CIE_cool(n, T);
-      cool = Cloudy_cool(n, T);
+      cool = CIE_cool(n, T);
+      //cool = Cloudy_cool(n, T);
       // calculate new change in temperature
       del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
     }
@@ -132,7 +133,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
 
     // set a temperature floor
     // (don't change this cell if the thread crashed)
-    //if (T > 0.0 && E > 0.0) T = fmax(T, T_min);
+    if (T > 0.0 && E > 0.0) T = fmax(T, T_min);
     // set a temperature ceiling 
     //T = fmin(T, T_max);
 
@@ -143,9 +144,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     ge -= KB*del_T / (mu*MP*(gamma-1.0)*SP_ENERGY_UNIT);
     #endif
     // calculate cooling rate for new T
-    //cool = CIE_cool(n, T);
-    cool = Cloudy_cool(n, T);
-    printf("%d %d %d %e %e %e\n", xid, yid, zid, n, T, cool);
+    cool = CIE_cool(n, T);
+    //cool = Cloudy_cool(n, T);
     // only use good cells in timestep calculation (in case some have crashed)
     if (n > 0 && T > 0 && cool > 0.0) {
       // limit the timestep such that delta_T is 10% 

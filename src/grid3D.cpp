@@ -483,6 +483,116 @@ Real Grid3D::Update_Grid(void)
 }
 
 
+void Grid3D::Fix_Cells(void)
+{
+  int i, j, k, id;
+  Real d, mx, my, mz, P, E;
+  Real n, T, mu;
+  mu = 0.6;
+
+  for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
+    for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
+      for (i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
+
+        id = i + j*H.nx + k*H.nx*H.ny;
+
+        d = C.density[id];
+        E = C.Energy[id];
+        mx = C.momentum_x;
+        my = C.momentum_y;
+        mz = C.momentum_z;
+        P = (E - (0.5/d)*(mx*mx+ my*my+ mz*mz))*(gama-1.0);
+        n = d*DENSITY_UNIT/(mu*MP);
+        #ifdef DE
+        T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB); 
+        #else
+        T = P*PRESSURE_UNIT/(n*KB);
+        #endif
+
+        // if there is a problem, replace the cell value with surrounding cell average
+        if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e9) {
+
+          printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
+
+          int idn;
+          int imo = i-1 + j*nx + k*nx*ny;
+          int ipo = i+1 + j*nx + k*nx*ny;
+          int jmo = i + (j-1)*nx + k*nx*ny;
+          int jpo = i + (j+1)*nx + k*nx*ny;
+          int kmo = i + j*nx + (k-1)*nx*ny;
+          int kpo = i + j*nx + (k+1)*nx*ny;
+
+          int N = 0;
+          Real d_av, vx_av, vy_av, vz_av, P_av, C, C_av;
+          d_av = vx_av = vy_av = vz_av = P_av = C_av = 0.0;
+
+          for (int kk=k-1; kk<=k+1; kk++) {
+          for (int jj=j-1; jj<=j+1; jj++) {
+          for (int ii=i-1; ii<=i+1; ii++) {
+
+            idn = ii+jj*H.nx+kk*H.nx*H.ny; 
+            d = C.density[idn];
+            mx = C.momentum_x[idn];
+            my = C.momentum_y[idn];
+            mz = C.momentum_z[idn];
+            P  = (C.Energy[idn] - (0.5/d)*(mx*mx + my*my + mz*mz))*(gama-1.0);
+            #ifdef SCALAR
+            C  = C.scalar[idn] / d;
+            #endif
+            if (d > 0.0 && P > 0.0) {
+              d_av += d;
+              vx_av += mx;
+              vy_av += my;
+              vz_av += mz;
+              P_av += P/(gama-1.0);
+              #ifdef SCALAR
+              C_av += C;
+              #endif
+              N++;
+            }
+
+          }
+          }
+          }
+
+          P_av = P_av / N;
+          vx_av = vx_av/d_av;
+          vy_av = vy_av/d_av;
+          vz_av = vz_av/d_av;
+          d_av = d_av/N;
+          #ifdef SCALAR
+          C_av = C_av/N;
+          #endif
+
+          // replace cell values with new averaged values
+          C.density[id] = d_av;
+          C.momentum_x[id] = d_av*vx_av;
+          C.momentum_y[id] = d_av*vy_av;
+          C.momentum_z[id] = d_av*vz_av;
+          C.Energy[id] = P_av/(gama-1.0) + 0.5*d_av*(vx_av*vx_av + vy_av*vy_av + vz_av*vz_av);
+          #ifdef DE
+          C.GasEnergy[id] = P_av/(gama-1.0);
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] = d_av*C_av;
+          #endif
+
+          d = d_av;
+          E = P_av/(gama-1.0) + 0.5*d_av*(vx_av*vx_av + vy_av*vy_av + vz_av*vz_av);
+          P = P_av;
+          n = d*DENSITY_UNIT/(mu*MP);
+          T = P_av*PRESSURE_UNIT/(n*KB);
+
+          printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
+
+        }
+      }
+    }
+  }
+
+}
+
+
 /*! \fn void Reset(void)
  *  \brief Reset the Grid3D class. */
 void Grid3D::Reset(void)

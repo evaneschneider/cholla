@@ -419,6 +419,10 @@ class Grid3D
      *  \brief Initialize the grid with a 3D disk following a Miyamoto-Nagai profile. */
     void Disk_3D(parameters P);    
 
+    Real Add_Supernova(void);    
+    Real Add_Supernovae(void);    
+    Real Add_Supernovae_CC85(void);
+
     /*! \fn void Set_Boundary_Conditions(parameters P)
      *  \brief Set the boundary conditions based on info in the parameters structure. */
     void Set_Boundary_Conditions(parameters P);

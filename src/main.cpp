@@ -45,6 +45,9 @@ int main(int argc, char *argv[])
   int nfile = 0; // number of output files
   Real outtime = 0; // current output time
 
+  // SN timing variables
+  Real dt_SN = 100.0; // time between SN (code units)
+  Real t_SN_next = 0.0;
 
   // read in command line arguments
   if (argc != 2)
@@ -80,6 +83,7 @@ int main(int argc, char *argv[])
     dti = C_cfl / G.H.dt;
     outtime += G.H.t;
     nfile = P.nfile*P.nfull;
+    t_SN_next += G.H.t;
   }
 
   // set boundary conditions (assign appropriate values to ghost cells)
@@ -134,6 +138,19 @@ int main(int argc, char *argv[])
       G.H.dt = outtime - G.H.t;
     }
 
+    // Add supernovae
+    // Real sn_dti = G.Add_Supernovae_CC85();
+    Real sn_dti = G.Add_Supernovae();
+    /*
+    if (G.H.t >= t_SN_next) {
+      Real sn_dti = G.Add_Supernova();
+      t_SN_next += dt_SN;
+    }
+    */
+    if (sn_dti > 0) {
+      G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
+    }
+
     #ifdef MPI_CHOLLA
     G.H.dt = ReduceRealMin(G.H.dt);
     #endif
@@ -154,6 +171,9 @@ int main(int argc, char *argv[])
     #endif //MPI_CHOLLA
     #endif //CPU_TIME
     //printf("%d After Grid Update: %f %f\n", procID, G.H.dt, dti);
+
+    // Fix bad cells
+    G.Fix_Cells();
 
     // update the time
     G.H.t += G.H.dt;
