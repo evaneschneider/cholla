@@ -20,7 +20,6 @@
 #include "VL_3D_cuda.h"
 #include "io.h"
 #include "error_handling.h"
-#include "ran.h"
 #ifdef MPI_CHOLLA
 #include <mpi.h>
 #ifdef HDF5
@@ -498,9 +497,9 @@ void Grid3D::Fix_Cells(void)
 
         d = C.density[id];
         E = C.Energy[id];
-        mx = C.momentum_x;
-        my = C.momentum_y;
-        mz = C.momentum_z;
+        mx = C.momentum_x[id];
+        my = C.momentum_y[id];
+        mz = C.momentum_z[id];
         P = (E - (0.5/d)*(mx*mx+ my*my+ mz*mz))*(gama-1.0);
         n = d*DENSITY_UNIT/(mu*MP);
         #ifdef DE
@@ -515,29 +514,30 @@ void Grid3D::Fix_Cells(void)
           printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
 
           int idn;
-          int imo = i-1 + j*nx + k*nx*ny;
-          int ipo = i+1 + j*nx + k*nx*ny;
-          int jmo = i + (j-1)*nx + k*nx*ny;
-          int jpo = i + (j+1)*nx + k*nx*ny;
-          int kmo = i + j*nx + (k-1)*nx*ny;
-          int kpo = i + j*nx + (k+1)*nx*ny;
-
           int N = 0;
-          Real d_av, vx_av, vy_av, vz_av, P_av, C, C_av;
-          d_av = vx_av = vy_av = vz_av = P_av = C_av = 0.0;
+          Real d_av, vx_av, vy_av, vz_av, P_av;
+          d_av = vx_av = vy_av = vz_av = P_av = 0.0;
+          #ifdef SCALAR
+          Real scalar[NSCALARS], scalar_av[NSCALARS];
+          for (int n=0; n<NSCALARS; n++) {
+            scalar_av[n] = 0.0;
+          }
+          #endif
 
           for (int kk=k-1; kk<=k+1; kk++) {
           for (int jj=j-1; jj<=j+1; jj++) {
           for (int ii=i-1; ii<=i+1; ii++) {
 
-            idn = ii+jj*H.nx+kk*H.nx*H.ny; 
+            idn = ii + jj*H.nx + kk*H.nx*H.ny; 
             d = C.density[idn];
             mx = C.momentum_x[idn];
             my = C.momentum_y[idn];
             mz = C.momentum_z[idn];
             P  = (C.Energy[idn] - (0.5/d)*(mx*mx + my*my + mz*mz))*(gama-1.0);
             #ifdef SCALAR
-            C  = C.scalar[idn] / d;
+            for (int n = 0; n<NSCALARS; n++) {
+              scalar[n]  = C.scalar[idn+n*H.n_cells] / d;
+            }
             #endif
             if (d > 0.0 && P > 0.0) {
               d_av += d;
@@ -546,7 +546,9 @@ void Grid3D::Fix_Cells(void)
               vz_av += mz;
               P_av += P/(gama-1.0);
               #ifdef SCALAR
-              C_av += C;
+              for (int n=0; n<NSCALARS; n++) {
+                scalar_av[n] += scalar[n];
+              }
               #endif
               N++;
             }
@@ -561,7 +563,9 @@ void Grid3D::Fix_Cells(void)
           vz_av = vz_av/d_av;
           d_av = d_av/N;
           #ifdef SCALAR
-          C_av = C_av/N;
+          for (int n=0; n<NSCALARS; n++) {
+            scalar_av[n] = scalar_av[n]/N;
+          }
           #endif
 
           // replace cell values with new averaged values
@@ -574,7 +578,9 @@ void Grid3D::Fix_Cells(void)
           C.GasEnergy[id] = P_av/(gama-1.0);
           #endif
           #ifdef SCALAR
-          C.scalar[id] = d_av*C_av;
+          for (int n=0; n<NSCALARS; n++) {
+            C.scalar[id+n*H.n_cells] = d_av*scalar_av[n];
+          }
           #endif
 
           d = d_av;
