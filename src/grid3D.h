@@ -427,7 +427,7 @@ class Grid3D
     Real Add_Supernovae(void);    
     Real Add_Supernovae_CC85(void);
     void Fix_Cells(void);
-    void Analysis_Functions(Real *bubble_mass);
+    void Analysis_Functions(Real *bubble_radius, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th);
 
     /*! \fn void Set_Boundary_Conditions(parameters P)
      *  \brief Set the boundary conditions based on info in the parameters structure. */

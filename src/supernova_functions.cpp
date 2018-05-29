@@ -532,12 +532,18 @@ Real Grid3D::Add_Supernovae_CC85(void)
 }
 
 
-void Grid3D::Analysis_Functions(Real *bubble_mass) {
+void Grid3D::Analysis_Functions(Real *bubble_radius, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th) {
 
+  *bubble_radius = 0.0;
   *bubble_mass = 0.0;
+  *bubble_energy = 0.0;
+  *bubble_energy_th = 0.0;
 
-  Real d, mx, my, mz, P, E;
-  Real n, T, mu;
+  Real d, mx, my, mz, P, E, gE;
+  Real vx, vy, vz, v, n, T, mu, V;
+  Real v_to_kmps = LENGTH_UNIT/TIME_UNIT/1e5;
+  Real e_s = MASS_UNIT*LENGTH_UNIT*LENGTH_UNIT / (TIME_UNIT*TIME_UNIT) / 1e51;
+  int n_bub = 0;
   mu = 1.27;
 
   for (int k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
@@ -551,14 +557,28 @@ void Grid3D::Analysis_Functions(Real *bubble_mass) {
         mx = C.momentum_x[id];
         my = C.momentum_y[id];
         mz = C.momentum_z[id];
+        E = C.Energy[id];
         P = (E - (0.5/d)*(mx*mx+ my*my+ mz*mz))*(gama-1.0);
+        vx = mx/d;
+        vy = my/d;
+        vz = mz/d;
+        v = sqrt(vx*vx + vy*vy + vz*vz);
         n = d*DENSITY_UNIT/(mu*MP);
         #ifdef DE
+        gE = C.GasEnergy[id];
         T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB); 
         #else
+        gE = P/(gama-1.0);
         T = P*PRESSURE_UNIT/(n*KB);
         #endif
 
+        // cell is counted as being in the bubble
+        if (T > 1e5 || v*v_to_kmps > 1.5) {
+          n_bub++;
+          *bubble_energy += E;
+          *bubble_energy_th += gE;
+
+        }
         if (T > 1e5) {
           *bubble_mass += d*H.dx*H.dy*H.dz;
         }
@@ -566,5 +586,9 @@ void Grid3D::Analysis_Functions(Real *bubble_mass) {
       }
     }
   }
+  V = n_bub*H.dx*H.dy*H.dz;
+  *bubble_radius = pow(0.75*V/PI, (1./3.));
+  *bubble_energy = *bubble_energy * V * e_s;
+  *bubble_energy_th = *bubble_energy_th * V * e_s;
 
 }

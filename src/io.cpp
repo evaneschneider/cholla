@@ -36,9 +36,9 @@ void WriteData(Grid3D G, struct parameters P, int nfile)
 /* Output the history variables to file. */
 void WriteHistory(Grid3D G, struct parameters P)
 {
-  Real bubble_mass;
+  Real bubble_radius, bubble_mass, bubble_energy, bubble_energy_th;
 
-  G.Analysis_Functions(&bubble_mass);
+  G.Analysis_Functions(&bubble_radius, &bubble_mass, &bubble_energy, &bubble_energy_th);
 
   #ifdef MPI_CHOLLA
   MPI_Barrier(world);
@@ -59,7 +59,7 @@ void WriteHistory(Grid3D G, struct parameters P)
   if(out == NULL) {printf("Error opening output file.\n"); exit(-1); }
 
   // write the results from the analysis functions
-  fprintf(out, "%10.7f %8.3e\n", G.H.t, bubble_mass);
+  fprintf(out, "%8.3f %8.5e %8.5e %8.5e %8.5e\n", G.H.t, bubble_radius, bubble_mass, bubble_energy, bubble_energy_th);
 
   // close the output file
   fclose(out);
