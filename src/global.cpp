@@ -143,6 +143,8 @@ void parse_params (char *param_file, struct parameters * parms)
       parms->tout = atof(value);
     else if (strcmp(name, "outstep")==0)
       parms->outstep = atof(value);
+    else if (strcmp(name, "histstep")==0)
+      parms->histstep = atof(value);
     else if (strcmp(name, "gamma")==0)
       parms->gamma = atof(value);
     else if (strcmp(name, "init")==0)

@@ -92,6 +92,7 @@ struct parameters
   int nz;
   double tout;
   double outstep;
+  double histstep;
   Real gamma;
   char init[MAXLEN];
   int nfile;

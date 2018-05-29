@@ -107,6 +107,9 @@ Real ReduceRealMin(Real x);
 /* MPI reduction wrapper for avg(Real)*/
 Real ReduceRealAvg(Real x);
 
+/* MPI reduction wrapper for sum(Real)*/
+Real ReduceRealSum(Real x);
+
 /* Set the domain properties */
 void Set_Parallel_Domain(Real xmin_global, Real ymin_global, Real zmin_global, Real xlen_global, Real ylen_global, Real zlen_global, struct Header *H);
 

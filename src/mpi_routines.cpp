@@ -646,6 +646,19 @@ Real ReduceRealAvg(Real x)
 }
 
 
+/* MPI reduction wrapper for sum(Real)*/
+Real ReduceRealSum(Real x)
+{
+  Real in = x;
+  Real out;
+  Real y;
+
+  MPI_Allreduce(&in, &out, 1, MPI_CHREAL, MPI_SUM, world);
+  y = (Real) out;
+  return y;
+}
+
+
 
 /* Set the domain properties */
 void Set_Parallel_Domain(Real xmin_global, Real ymin_global, Real zmin_global, Real xlen_global, Real ylen_global, Real zlen_global, struct Header *H)

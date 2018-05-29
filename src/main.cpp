@@ -15,6 +15,7 @@
 #include "error_handling.h"
 
 #define OUTPUT
+#define HIST
 //#define CPU_TIME
 
 int main(int argc, char *argv[])
@@ -44,6 +45,7 @@ int main(int argc, char *argv[])
   struct parameters P;
   int nfile = 0; // number of output files
   Real outtime = 0; // current output time
+  Real histtime = 0;
 
   // SN timing variables
   Real sn_dti = 0.0;
@@ -108,6 +110,11 @@ int main(int argc, char *argv[])
   #endif //OUTPUT
   // increment the next output time
   outtime += P.outstep;
+
+  #ifdef HIST
+  WriteHistory(G, P);
+  histtime += P.histstep;
+  #endif
 
   #ifdef CPU_TIME
   stop_init = get_time();
@@ -223,7 +230,14 @@ int main(int argc, char *argv[])
       #endif //OUTPUT
       // update to the next output time
       outtime += P.outstep;      
+
     }
+    #ifdef HIST
+    if (G.H.t >= histtime) {
+      WriteHistory(G, P);
+      histtime += P.histstep;
+    }
+    #endif
 /*
     // check for failures
     for (int i=G.H.n_ghost; i<G.H.nx-G.H.n_ghost; i++) {

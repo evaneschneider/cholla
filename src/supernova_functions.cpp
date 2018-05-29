@@ -532,7 +532,11 @@ Real Grid3D::Add_Supernovae_CC85(void)
 }
 
 
-Real Grid3D::Analysis_Functions(void) {
+Real Grid3D::Analysis_Functions(Real *bubble_mass) {
 
+  *bubble_mass = 0.0;
+  #ifdef MPI_CHOLLA
+  ReduceRealSum(&bubble_mass);
+  #endif
 
 }

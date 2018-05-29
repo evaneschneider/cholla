@@ -33,6 +33,40 @@ void WriteData(Grid3D G, struct parameters P, int nfile)
   #endif /*SLICES*/
 }
 
+/* Output the history variables to file. */
+void OutputHistory(Grid3D G, struct parameters P)
+{
+  Real bubble_mass;
+
+  G.Analysis_Functions(&bubble_mass);
+
+  #ifdef MPI_CHOLLA
+  if (procID == 0) {
+  #endif 
+
+  char filename[100];
+
+  // create the filename
+  strcpy(filename, P.outdir); 
+  strcat(filename, P.init);   
+  strcat(filename,".hist");
+
+  // open the file
+  FILE *out;
+  out = fopen(filename, "a");
+  if(out == NULL) {printf("Error opening output file.\n"); exit(-1); }
+
+  // write the results from the analysis functions
+  fprintf(out, "%8.3e %8.3e", G.H.t, &bubble_mass);
+
+  // close the output file
+  fclose(out);
+  
+  #ifdef MPI_CHOLLA
+  if (procID == 0) }
+  #endif 
+}
+
 
 /* Output the grid data to file. */
 void OutputData(Grid3D G, struct parameters P, int nfile)
