@@ -540,11 +540,11 @@ void Grid3D::Analysis_Functions(Real *bubble_mass) {
   Real n, T, mu;
   mu = 1.27;
 
-  for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
-    for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
-      for (i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
+  for (int k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
+    for (int j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
+      for (int i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
 
-        id = i + j*H.nx + k*H.nx*H.ny;
+        int id = i + j*H.nx + k*H.nx*H.ny;
 
         d = C.density[id];
         E = C.Energy[id];
@@ -560,7 +560,7 @@ void Grid3D::Analysis_Functions(Real *bubble_mass) {
         #endif
 
         if (T > 1e5) {
-          bubble_mass += d*H.dx*H.dy*H.dz;
+          *bubble_mass += d*H.dx*H.dy*H.dz;
         }
 
       }

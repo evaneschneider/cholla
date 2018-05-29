@@ -41,6 +41,7 @@ void WriteHistory(Grid3D G, struct parameters P)
   G.Analysis_Functions(&bubble_mass);
 
   #ifdef MPI_CHOLLA
+  MPI_Barrier(world);
   ReduceRealSum(bubble_mass);
   if (procID == 0) {
   #endif 
@@ -58,7 +59,7 @@ void WriteHistory(Grid3D G, struct parameters P)
   if(out == NULL) {printf("Error opening output file.\n"); exit(-1); }
 
   // write the results from the analysis functions
-  fprintf(out, "%8.3e %8.3e", G.H.t, &bubble_mass);
+  fprintf(out, "%10.7f %8.3e\n", G.H.t, bubble_mass);
 
   // close the output file
   fclose(out);
