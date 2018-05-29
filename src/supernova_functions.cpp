@@ -536,4 +536,35 @@ void Grid3D::Analysis_Functions(Real *bubble_mass) {
 
   *bubble_mass = 0.0;
 
+  Real d, mx, my, mz, P, E;
+  Real n, T, mu;
+  mu = 1.27;
+
+  for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
+    for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
+      for (i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
+
+        id = i + j*H.nx + k*H.nx*H.ny;
+
+        d = C.density[id];
+        E = C.Energy[id];
+        mx = C.momentum_x[id];
+        my = C.momentum_y[id];
+        mz = C.momentum_z[id];
+        P = (E - (0.5/d)*(mx*mx+ my*my+ mz*mz))*(gama-1.0);
+        n = d*DENSITY_UNIT/(mu*MP);
+        #ifdef DE
+        T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB); 
+        #else
+        T = P*PRESSURE_UNIT/(n*KB);
+        #endif
+
+        if (T > 1e5) {
+          bubble_mass += d*H.dx*H.dy*H.dz;
+        }
+
+      }
+    }
+  }
+
 }
