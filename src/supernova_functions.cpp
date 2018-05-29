@@ -25,7 +25,8 @@ Real Grid3D::Add_Supernova(void)
   Real xl, xr, yl, yr, zl, zr, rl, rr;
   int incount, ii;
   Real weight, xpoint, ypoint, zpoint;
-  R_s = 2*H.dx; // supernova radius, pc
+  //R_s = 2*H.dx; // supernova radius, pc
+  R_s = 5; // supernova radius, pc
   M = 15.0; // mass input, in M_sun
   E = 1.0e51; // energy input, in erg
   Real x_sn, y_sn, z_sn; // central location of SN
@@ -530,3 +531,8 @@ Real Grid3D::Add_Supernovae_CC85(void)
 
 }
 
+
+Real Grid3D::Analysis_Functions(void) {
+
+
+}

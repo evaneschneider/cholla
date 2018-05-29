@@ -258,6 +258,7 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
 
     // copy the updated conserved variable array back to the CPU
     CudaSafeCall( cudaMemcpy(tmp2, dev_conserved, n_fields*BLOCK_VOL*sizeof(Real), cudaMemcpyDeviceToHost) );
+    CudaCheckError();
 
     // copy the updated conserved variable array from the buffer into the host_conserved array on the CPU
     host_return_block_3D(nx, ny, nz, nx_s, ny_s, nz_s, n_ghost, block, block1_tot, block2_tot, block3_tot, remainder1, remainder2, remainder3, BLOCK_VOL, host_conserved1, buffer, n_fields);
@@ -276,6 +277,7 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
       min_dt = fmin(min_dt, host_dt_array[i]);
     }  
     if (min_dt < C_cfl/max_dti) {
+      printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
       max_dti = C_cfl/min_dt;
     }
     #endif

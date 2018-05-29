@@ -52,11 +52,11 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
   #ifdef DE
   Real ge;
   #endif
-  Real T_min = 1.0e4; // minimum temperature allowed
+  Real T_min = 1.0e1; // minimum temperature allowed
   Real T_max = 1.0e9; // minimum temperature allowed
 
-  mu = 0.6;
-  //mu = 1.27;
+  //mu = 0.6;
+  mu = 1.27;
 
   // get a global thread ID
   int blockId = blockIdx.x + blockIdx.y*gridDim.x;
@@ -105,16 +105,18 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
 
     // calculate cooling rate per volume
     T = T_init;
-    if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
+    //if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
     // call the cooling function
-    cool = CIE_cool(n, T); 
+    //cool = CIE_cool(n, T); 
     //cool = Cloudy_cool(n, T); 
+    cool = TI_cool(n, T);
     
     // calculate change in temperature given dt
     del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
 
     // limit change in temperature to 1%
-    while (del_T/T > 0.01) {
+    int loop = 0;
+    while (del_T/T > 0.01 && T > T_min) {
       // what dt gives del_T = 0.01*T?
       dt_sub = 0.01*T*n*KB/(cool*TIME_UNIT*(gamma-1.0));
       // apply that dt
@@ -122,10 +124,16 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
       // how much time is left from the original timestep?
       dt -= dt_sub;
       // calculate cooling again
-      cool = CIE_cool(n, T);
+      //cool = CIE_cool(n, T);
       //cool = Cloudy_cool(n, T);
+      cool = TI_cool(n, T);
       // calculate new change in temperature
       del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
+      loop++;
+      if (loop > 100) {
+        printf("del_T: %e  T: %e  cool: %e\n", del_T, T, cool);
+        break;
+      }
     }
 
     // calculate final temperature
@@ -133,7 +141,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
 
     // set a temperature floor
     // (don't change this cell if the thread crashed)
-    if (T > 0.0 && E > 0.0) T = fmax(T, T_min);
+    //if (T > 0.0 && E > 0.0) T = fmax(T, T_min);
     // set a temperature ceiling 
     //T = fmin(T, T_max);
 
@@ -144,8 +152,9 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     ge -= KB*del_T / (mu*MP*(gamma-1.0)*SP_ENERGY_UNIT);
     #endif
     // calculate cooling rate for new T
-    cool = CIE_cool(n, T);
+    //cool = CIE_cool(n, T);
     //cool = Cloudy_cool(n, T);
+    cool = TI_cool(n, T);
     // only use good cells in timestep calculation (in case some have crashed)
     if (n > 0 && T > 0 && cool > 0.0) {
       // limit the timestep such that delta_T is 10% 
@@ -341,7 +350,6 @@ __device__ Real CIE_cool(Real n, Real T)
           tables at z = 0 with solar metallicity and an HM05 UV background. */
 __device__ Real Cloudy_cool(Real n, Real T)
 {
-#ifdef CLOUDY_COOL
   Real lambda = 0.0; //cooling rate, erg s^-1 cm^3
   Real H = 0.0; //heating rate, erg s^-1 cm^3
   Real cool = 0.0; //cooling per unit volume, erg /s / cm^3
@@ -353,18 +361,57 @@ __device__ Real Cloudy_cool(Real n, Real T)
   log_T = (log_T - 1.0)/8.1;
   log_n = (log_n + 6.0)/12.1; 
  
+#ifdef CLOUDY_COOL
   // don't cool below 10 K
   if (log10(T) > 1.0) {
   lambda = tex2D<float>(coolTexObj, log_T, log_n);
   }
   else lambda = 0.0;
   H = tex2D<float>(heatTexObj, log_T, log_n);
+#endif
 
   // cooling rate per unit volume
   cool = n*n*(powf(10, lambda) - powf(10, H));
 
   return cool;
-#endif
+}
+
+
+/* \fn __device__ Real TI_cool(Real n, Real T)
+ * \brief Estimated cooling / photoelectric heating function
+          based on description given in Kim et al. 2015. */
+__device__ Real TI_cool(Real n, Real T)
+{
+  Real lambda = 0.0; //cooling rate, erg s^-1 cm^3
+  Real  H = 0.0; //heating rate, erg s^-1
+  Real cool = 0.0; //cooling per unit volume, erg /s / cm^3
+  Real n_av = 1.0; //mean density in the sim volume
+
+  // Below 10K only include photoelectric heating
+  if (log10(T) < 1.0) {
+    H = n_av*1.0e-26;
+  }
+  // Koyama & Inutsaka 2002 analytic fit
+  if (log10(T) >= 1.0 && log10(T) < 4.0) {
+    lambda = 2e-26 * (1e7 * exp(-1.148e5 / (T+1000.0)) + 1.4e-2 * sqrt(T) * exp(-92.0/T));
+    H = n_av*1.0e-26;
+  }
+  // fit to cloudy CIE cooling function 
+  if (log10(T) >= 4.0 && log10(T) < 5.9) {
+    lambda = powf(10.0, (-1.3 * (log10(T) - 5.25) * (log10(T) - 5.25) - 21.25));
+  }
+  if (log10(T) >= 5.9 && log10(T) < 7.4) {
+    lambda = powf(10.0, (0.7 * (log10(T) - 7.1) * (log10(T) - 7.1) - 22.8));
+  }
+  if (log10(T) >= 7.4)  {
+    lambda = powf(10.0, (0.45*log10(T) - 26.065));
+  }
+ 
+  // cooling rate per unit volume
+  cool = n*(n*lambda - H);
+  //if (cool > 1.0e-20) printf("n: %e  T: %e  lambda: %e  H: %e\n", n, T, lambda, H);
+
+  return cool;
 }
 
 

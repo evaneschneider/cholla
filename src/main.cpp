@@ -46,7 +46,8 @@ int main(int argc, char *argv[])
   Real outtime = 0; // current output time
 
   // SN timing variables
-  Real dt_SN = 100.0; // time between SN (code units)
+  Real sn_dti = 0.0;
+  Real dt_SN = 10.0; // time between SN (code units)
   Real t_SN_next = 0.0;
 
   // read in command line arguments
@@ -139,14 +140,12 @@ int main(int argc, char *argv[])
     }
 
     // Add supernovae
-    // Real sn_dti = G.Add_Supernovae_CC85();
-    Real sn_dti = G.Add_Supernovae();
-    /*
+    //sn_dti = G.Add_Supernovae_CC85();
+    //sn_dti = G.Add_Supernovae();
     if (G.H.t >= t_SN_next) {
-      Real sn_dti = G.Add_Supernova();
+      sn_dti = G.Add_Supernova();
       t_SN_next += dt_SN;
     }
-    */
     if (sn_dti > 0) {
       G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
     }

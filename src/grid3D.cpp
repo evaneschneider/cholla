@@ -107,7 +107,7 @@ void Grid3D::Initialize(struct parameters *P)
   int nz_in = P->nz;
 
   // Set the CFL coefficient (a global variable)
-  C_cfl = 0.3;
+  C_cfl = 0.5;
 
 #ifndef MPI_CHOLLA
 
@@ -487,7 +487,7 @@ void Grid3D::Fix_Cells(void)
   int i, j, k, id;
   Real d, mx, my, mz, P, E;
   Real n, T, mu;
-  mu = 0.6;
+  mu = 1.27;
 
   for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
     for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
@@ -519,8 +519,8 @@ void Grid3D::Fix_Cells(void)
           d_av = vx_av = vy_av = vz_av = P_av = 0.0;
           #ifdef SCALAR
           Real scalar[NSCALARS], scalar_av[NSCALARS];
-          for (int n=0; n<NSCALARS; n++) {
-            scalar_av[n] = 0.0;
+          for (int nn=0; nn<NSCALARS; nn++) {
+            scalar_av[nn] = 0.0;
           }
           #endif
 
@@ -535,8 +535,8 @@ void Grid3D::Fix_Cells(void)
             mz = C.momentum_z[idn];
             P  = (C.Energy[idn] - (0.5/d)*(mx*mx + my*my + mz*mz))*(gama-1.0);
             #ifdef SCALAR
-            for (int n = 0; n<NSCALARS; n++) {
-              scalar[n]  = C.scalar[idn+n*H.n_cells] / d;
+            for (int nn = 0; nn<NSCALARS; nn++) {
+              scalar[nn]  = C.scalar[idn+nn*H.n_cells] / d;
             }
             #endif
             if (d > 0.0 && P > 0.0) {
@@ -546,8 +546,8 @@ void Grid3D::Fix_Cells(void)
               vz_av += mz;
               P_av += P/(gama-1.0);
               #ifdef SCALAR
-              for (int n=0; n<NSCALARS; n++) {
-                scalar_av[n] += scalar[n];
+              for (int nn=0; nn<NSCALARS; nn++) {
+                scalar_av[nn] += scalar[nn];
               }
               #endif
               N++;
@@ -563,8 +563,8 @@ void Grid3D::Fix_Cells(void)
           vz_av = vz_av/d_av;
           d_av = d_av/N;
           #ifdef SCALAR
-          for (int n=0; n<NSCALARS; n++) {
-            scalar_av[n] = scalar_av[n]/N;
+          for (int nn=0; nn<NSCALARS; nn++) {
+            scalar_av[nn] = scalar_av[nn]/N;
           }
           #endif
 
@@ -578,8 +578,8 @@ void Grid3D::Fix_Cells(void)
           C.GasEnergy[id] = P_av/(gama-1.0);
           #endif
           #ifdef SCALAR
-          for (int n=0; n<NSCALARS; n++) {
-            C.scalar[id+n*H.n_cells] = d_av*scalar_av[n];
+          for (int nn=0; nn<NSCALARS; nn++) {
+            C.scalar[id+nn*H.n_cells] = d_av*scalar_av[nn];
           }
           #endif
 

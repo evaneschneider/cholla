@@ -41,6 +41,12 @@ __device__ Real CIE_cool(Real n, Real T);
 __device__ Real Cloudy_cool(Real n, Real T);
 
 
+/* \fn __device__ Real TI_cool(Real n, Real T)
+ * \brief Estimated cooling / heating function based on description
+          given in Kim et al. 2015. */
+__device__ Real TI_cool(Real n, Real T);
+
+
 #endif //COOLING_CUDA_H
 #endif //COOLING_GPU
 #endif //CUDA
