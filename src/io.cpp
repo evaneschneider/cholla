@@ -34,13 +34,14 @@ void WriteData(Grid3D G, struct parameters P, int nfile)
 }
 
 /* Output the history variables to file. */
-void OutputHistory(Grid3D G, struct parameters P)
+void WriteHistory(Grid3D G, struct parameters P)
 {
   Real bubble_mass;
 
   G.Analysis_Functions(&bubble_mass);
 
   #ifdef MPI_CHOLLA
+  ReduceRealSum(bubble_mass);
   if (procID == 0) {
   #endif 
 
@@ -63,7 +64,7 @@ void OutputHistory(Grid3D G, struct parameters P)
   fclose(out);
   
   #ifdef MPI_CHOLLA
-  if (procID == 0) }
+  }
   #endif 
 }
 

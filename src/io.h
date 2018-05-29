@@ -5,7 +5,7 @@
 #include"grid3D.h"
 
 /* Output the history variables to file. */
-void OutputHistory(Grid3D G, struct parameters P);
+void WriteHistory(Grid3D G, struct parameters P);
 
 /* Write the data */
 void WriteData(Grid3D G, struct parameters P, int nfile);
