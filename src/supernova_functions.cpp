@@ -24,7 +24,8 @@ void Grid3D::Set_Cluster_Locations() {
   Real R_s, z_s;
   Real r_sn, phi_sn, x_sn, y_sn, z_sn;
   R_s = 0.75; // starburst radius, in kpc
-  z_s = 0.105; // starburst height, in kpc
+  //z_s = 0.105; // starburst height, in kpc
+  z_s = 0.01; // starburst height, in kpc
 
 
   // initialize the random seed
@@ -386,6 +387,9 @@ Real Grid3D::Add_Supernovae(void)
           #endif
           //M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
           //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot*H.dt;
+          #endif
         }
         // on the sphere
         if (rl < R_c && rr > R_c) {
@@ -410,6 +414,9 @@ Real Grid3D::Add_Supernovae(void)
           //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
           //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
           //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*weight*rho_dot*H.dt;
           #endif
           //M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
           //E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
