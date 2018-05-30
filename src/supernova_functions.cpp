@@ -16,10 +16,10 @@
 #include "ran.h"
 
 #define N_CL 100
-double clusters[N_CL][5];
+static Real clusters[N_CL][5];
 
 
-Set_Cluster_Locations() {
+void Grid3D::Set_Cluster_Locations() {
 
   Real R_s, z_s;
   Real r_sn, phi_sn, x_sn, y_sn, z_sn;
@@ -50,7 +50,7 @@ Set_Cluster_Locations() {
 }
 
 
-Rotate_Cluster(Real *x_sn, Real *y_sn, Real z_sn, Real r_sn, Real phi_sn, Real t) {
+void Rotate_Cluster(Real *x_sn, Real *y_sn, Real z_sn, Real r_sn, Real *phi_sn, Real t) {
 
   Real r_sph, a, v, phi;
 
@@ -58,7 +58,7 @@ Rotate_Cluster(Real *x_sn, Real *y_sn, Real z_sn, Real r_sn, Real phi_sn, Real t
   r_sph = sqrt(*x_sn * *x_sn + *y_sn * *y_sn + z_sn*z_sn);
 
   // set properties of halo and disk (these must match initial conditions)
-  Real a, a_disk_r, a_halo, a_halo_r;
+  Real a_disk_r, a_halo, a_halo_r;
   Real M_vir, M_d, R_vir, R_d, z_d, R_h, M_h, c_vir, phi_0_h, x;
   // MW model
   //M_vir = 1.0e12; // viral mass of in M_sun
@@ -78,22 +78,23 @@ Rotate_Cluster(Real *x_sn, Real *y_sn, Real z_sn, Real r_sn, Real phi_sn, Real t
   M_h = M_vir - M_d; // halo mass in M_sun
   R_h = R_vir / c_vir; // halo scale length in kpc
   phi_0_h = GN * M_h / (log(1.0+c_vir) - c_vir / (1.0+c_vir));
-  x = r_halo / R_h;
+  x = r_sph / R_h;
   
   // calculate acceleration due to NFW halo & Miyamoto-Nagai disk
   a_halo = - phi_0_h * (log(1+x) - x/(1+x)) / (r_sph*r_sph);
   a_halo_r = a_halo*(r_sn/r_sph);
   a_disk_r = - GN * M_d * r_sn * pow(r_sn*r_sn+ pow(R_d + sqrt(z_sn*z_sn + z_d*z_d),2), -1.5);
   // total acceleration is the sum of the halo + disk components
-  a = a_halo_r + a_disk_r;
+  a = fabs(a_halo_r) + fabs(a_disk_r);
   // radial velocity
   v = sqrt(r_sn*a);
   // how far has the cluster gone?
-  phi = phi_sn + v*t/r_sn;
+  // (t was sent to the function in Myr, need kyr for code units)
+  *phi_sn += v*1000*t/r_sn;
 
   // set new cluster center location
-  *x_sn = r_sn*cos(phi);
-  *y_sn = r_sn*sin(phi);
+  *x_sn = r_sn*cos(*phi_sn);
+  *y_sn = r_sn*sin(*phi_sn);
 
 
 }
@@ -321,7 +322,8 @@ Real Grid3D::Add_Supernovae(void)
     r_sn = clusters[nn][3];
     phi_sn = clusters[nn][4];
     // apply rotation (clusters move with keplarian velocity)
-    Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, phi_sn, t-15*ns);
+    Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t-15*ns);
+    if (nn==0) chprintf("x: %f y: %f z: %f r_sn: %f phi_sn: %f\n", x_sn, y_sn, z_sn, r_sn, phi_sn);
 
     int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
     // identify the global id of the cell containing the cluster center
@@ -613,20 +615,5 @@ Real Grid3D::Add_Supernovae_CC85(void)
   } // t > 0
 
   return max_dti;
-
-}
-
-
-
-void Grid3D::Allocate_Cluster_Array() {
-
-  clusters = (double *) malloc(3*N_CL*sizeof(double));  
-
-}
-
-
-void Grid3D::Free_Cluster_Array() {
-
-  free(clusters);
 
 }

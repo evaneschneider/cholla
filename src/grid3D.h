@@ -423,8 +423,7 @@ class Grid3D
     Real Add_Supernovae(void);    
     Real Add_Supernovae_CC85(void);
     void Fix_Cells(void);
-    void Allocate_Cluster_Array(void);
-    void Free_Cluster_Array(void);
+    void Set_Cluster_Locations(void);
 
     /*! \fn void Set_Boundary_Conditions(parameters P)
      *  \brief Set the boundary conditions based on info in the parameters structure. */
