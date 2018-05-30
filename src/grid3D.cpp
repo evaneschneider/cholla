@@ -34,7 +34,6 @@
 #endif
 
 
-
 /*! \fn Grid3D(void)
  *  \brief Constructor for the Grid. */
 Grid3D::Grid3D(void)
@@ -240,7 +239,9 @@ void Grid3D::AllocateMemory(void)
   #ifdef CLOUDY_COOL
   //printf("Warning: Cloudy cooling isn't currently working. No cooling will be applied.\n");
   Load_Cuda_Textures();
-  #endif  
+  #endif
+
+  Allocate_Cluster_Array();
 
 }
 
@@ -625,4 +626,6 @@ void Grid3D::FreeMemory(void)
   Free_Cuda_Textures();
   #endif
   #endif
+
+  Free_Cluster_Array();
 }
