@@ -42,7 +42,6 @@ int main(int argc, char *argv[])
   // input parameter variables
   char *param_file;
   struct parameters P;
-  int nfile = 0; // number of output files
   Real outtime = 0; // current output time
 
   // SN timing variables
@@ -82,7 +81,6 @@ int main(int argc, char *argv[])
   if (strcmp(P.init, "Read_Grid") == 0) {
     dti = C_cfl / G.H.dt;
     outtime += G.H.t;
-    nfile = P.nfile*P.nfull;
     t_SN_next += G.H.t;
   }
 
@@ -100,13 +98,11 @@ int main(int argc, char *argv[])
   if (strcmp(P.init, "Read_Grid") != 0) {
   // write the initial conditions to file
   chprintf("Writing initial conditions to file...\n");
-  WriteData(G, P, nfile);
+  WriteData(G, P);
   }
-  // add one to the output file count
-  nfile++;
   #endif //OUTPUT
   // increment the next output time
-  outtime += P.outstep;
+  outtime += H.out_step;
 
   #ifdef CPU_TIME
   stop_init = get_time();
@@ -218,12 +214,11 @@ int main(int argc, char *argv[])
     {
       #ifdef OUTPUT
       /*output the grid data*/
-      WriteData(G, P, nfile);
+      WriteData(G, P);
       // add one to the output file count
-      nfile++;
       #endif //OUTPUT
       // update to the next output time
-      outtime += P.outstep;      
+      outtime += H.out_step;      
     }
 /*
     // check for failures
