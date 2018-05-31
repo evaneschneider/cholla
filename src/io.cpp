@@ -18,7 +18,7 @@
 void rotate_point(Real x, Real y, Real z, Real delta, Real phi, Real theta, Real *xp, Real *yp, Real *zp);
 
 /* Write the initial conditions */
-void WriteData(Grid3D G, struct parameters P)
+void WriteData(Grid3D G, parameters P)
 {
   /*call the data output routine*/
   OutputData(G,P);
@@ -41,7 +41,7 @@ void OutputData(Grid3D G, struct parameters P)
   int nfile = G.H.t/P.gridstep;
 
   // status of flag determines whether to output the full grid
-  if (G.H.t % P.gridstep == 0) flag = 1;
+  if (fmod(G.H.t, P.gridstep) == 0) flag = 1;
 
   if (flag == 1) {
 
@@ -99,13 +99,13 @@ void OutputData(Grid3D G, struct parameters P)
 
 
 /* Output a projection of the grid data to file. */
-void OutputProjectedData(Grid3D G, struct parameters P)
+void OutputProjectedData(Grid3D G, parameters P)
 {
   int flag = 0;
   int nfile = G.H.t/P.projstep;
 
   // status of flag determines whether to output the full grid
-  if (G.H.t % P.projstep == 0) flag = 1;
+  if (fmod(G.H.t, P.projstep) == 0) flag = 1;
 
   if (flag == 1) {
 
@@ -152,13 +152,13 @@ void OutputProjectedData(Grid3D G, struct parameters P)
 
 
 /* Output a rotated projection of the grid data to file. */
-void OutputRotatedProjectedData(Grid3D G, struct parameters P)
+void OutputRotatedProjectedData(Grid3D G, parameters P)
 {
   int flag = 0;
   int nfile = G.H.t/P.projstep;
 
   // status of flag determines whether to output the full grid
-  if (G.H.t % P.projstep == 0) flag = 1;
+  if (fmod(G.H.t, P.projstep) == 0) flag = 1;
 
   if (flag == 1) {
 
@@ -219,7 +219,7 @@ void OutputRotatedProjectedData(Grid3D G, struct parameters P)
 
       // case 2 -- outputting at a rotating delta 
       // rotation rate given in the parameter file
-      G.R.delta = fmod((nfile*G.R.ddelta_dt*2.0*PI , (2.0*PI));
+      G.R.delta = fmod(nfile*G.R.ddelta_dt*2.0*PI , (2.0*PI));
 
       // Create a new file 
       file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -265,12 +265,13 @@ void OutputRotatedProjectedData(Grid3D G, struct parameters P)
 
 
 /* Output xy, xz, and yz slices of the grid data. */
-void OutputSlices(Grid3D G, struct parameters P)
+void OutputSlices(Grid3D G, parameters P)
 {
   int flag = 0;
+  int nfile = G.H.t/P.slicestep;
 
   // status of flag determines whether to output the full grid
-  if (G.H.t % P.slicestep == 0) flag = 1;
+  if (fmod(G.H.t, P.slicestep) == 0) flag = 1;
 
   if (flag == 1) {
 
@@ -282,7 +283,7 @@ void OutputSlices(Grid3D G, struct parameters P)
 
     // create the filename
     strcpy(filename, P.outdir); 
-    sprintf(timestep, "%d_slice", G.H.t/P.slicestep);
+    sprintf(timestep, "%d_slice", nfile);
     strcat(filename,timestep);   
     strcat(filename,".h5");
 

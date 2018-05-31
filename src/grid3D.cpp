@@ -109,12 +109,12 @@ void Grid3D::Initialize(struct parameters *P)
   C_cfl = 0.3;
 
   // Set the output timestep
-  H.out_step = P.gridstep;
+  H.out_step = P->gridstep;
   #ifdef PROJECTION
-  H.out_step = fmin(P.projstep, H.out_step)
+  H.out_step = fmin(P->projstep, H.out_step);
   #endif
   #ifdef SLICES
-  H.out_step = fmin(P.slicestep, H.out_step)
+  H.out_step = fmin(P->slicestep, H.out_step);
   #endif
 
 #ifndef MPI_CHOLLA

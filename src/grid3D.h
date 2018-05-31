@@ -186,7 +186,7 @@ struct Header
 
   /*! \var out_step
   *  \brief How often to output data */
-  Real H.out_step;
+  double out_step;
 
   /*! \var n_step
   *  \brief Number of timesteps taken */

@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
   }
   #endif //OUTPUT
   // increment the next output time
-  outtime += H.out_step;
+  outtime += G.H.out_step;
 
   #ifdef CPU_TIME
   stop_init = get_time();
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
       // add one to the output file count
       #endif //OUTPUT
       // update to the next output time
-      outtime += H.out_step;      
+      outtime += G.H.out_step;      
     }
 /*
     // check for failures

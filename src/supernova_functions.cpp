@@ -314,7 +314,7 @@ Real Grid3D::Add_Supernovae(void)
 
   int ns = int(t)/15; // change location of clusters every 15 Myr
 
-  for (int nn=ns; nn<N_cluster; nn++) {
+  for (int nn=ns*N_cluster; nn<(ns+1)*N_cluster; nn++) {
 
     // look up the cluster location from the list
     x_sn = clusters[nn][0];
@@ -324,7 +324,6 @@ Real Grid3D::Add_Supernovae(void)
     phi_sn = clusters[nn][4];
     // apply rotation (clusters move with keplarian velocity)
     Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t-15*ns);
-    if (nn==0) chprintf("x: %f y: %f z: %f r_sn: %f phi_sn: %f\n", x_sn, y_sn, z_sn, r_sn, phi_sn);
 
     int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
     // identify the global id of the cell containing the cluster center
