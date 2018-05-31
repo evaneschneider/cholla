@@ -141,8 +141,12 @@ void parse_params (char *param_file, struct parameters * parms)
       parms->nz = atoi(value);
     else if (strcmp(name, "tout")==0)
       parms->tout = atof(value);
-    else if (strcmp(name, "outstep")==0)
-      parms->outstep = atof(value);
+    else if (strcmp(name, "gridstep")==0)
+      parms->gridstep = atof(value);
+    else if (strcmp(name, "projstep")==0)
+      parms->projstep = atof(value);
+    else if (strcmp(name, "slicestep")==0)
+      parms->slicestep = atof(value);
     else if (strcmp(name, "gamma")==0)
       parms->gamma = atof(value);
     else if (strcmp(name, "init")==0)

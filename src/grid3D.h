@@ -184,6 +184,10 @@ struct Header
   *  \brief Wall time */
   Real t_wall;
 
+  /*! \var out_step
+  *  \brief How often to output data */
+  Real H.out_step;
+
   /*! \var n_step
   *  \brief Number of timesteps taken */
   int n_step;
