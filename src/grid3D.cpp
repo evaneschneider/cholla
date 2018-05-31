@@ -250,7 +250,7 @@ void Grid3D::AllocateMemory(void)
   Load_Cuda_Textures();
   #endif
 
-  Allocate_Cluster_Array();
+  Set_Cluster_Locations();
 
 }
 
@@ -636,5 +636,4 @@ void Grid3D::FreeMemory(void)
   #endif
   #endif
 
-  Free_Cluster_Array();
 }
