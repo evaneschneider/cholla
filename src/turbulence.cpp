@@ -9,7 +9,7 @@
 
 /*! \fn Apply_Forcing(void)
  *  \brief Apply a forcing field to continuously generate turbulence. */
-void Grid3D::Apply_Forcing(void)
+Real Grid3D::Apply_Forcing(void)
 {
   int i, j, k, id, fid;
   int n_cells = H.nx_real * H.ny_real * H.nz_real;  
@@ -23,6 +23,7 @@ void Grid3D::Apply_Forcing(void)
   Real vxsq, vysq, vzsq;
   Real mxsq, mysq, mzsq;
   Real mx, my, mz;
+  Real vx, vy, vz, P, d_inv, cs, max_vx, max_vy, max_vz, max_dti;
   Real M, d_tot;  
   A1 = rng_direction(3);
   A2 = rng_direction(3);
@@ -42,7 +43,7 @@ void Grid3D::Apply_Forcing(void)
   //printf("%f %f %f\n", A2[0], A2[1], A2[2]);
   //printf("%f %f %f\n", B2[0], B2[1], B2[2]);
   //set the desired Mach number
-  M = 2.0;
+  M = 1.0;
   d_tot = 0;
   istart = H.n_ghost;
   iend   = H.nx-H.n_ghost;
@@ -172,6 +173,20 @@ void Grid3D::Apply_Forcing(void)
         mxsq += C.momentum_x[id]*C.momentum_x[id]/C.density[id];
         mysq += C.momentum_y[id]*C.momentum_y[id]/C.density[id];
         mzsq += C.momentum_z[id]*C.momentum_z[id]/C.density[id];        
+
+
+        // recalculate the timestep
+        d_inv = 1.0 / C.density[id];
+        vx = d_inv * C.momentum_x[id];
+        vy = d_inv * C.momentum_y[id];
+        vz = d_inv * C.momentum_z[id];
+        P = fmax((C.Energy[id] - 0.5*C.density[id]*(vx*vx + vy*vy + vz*vz) )*(gama-1.0), TINY_NUMBER);
+        cs = sqrt(d_inv * gama * P);
+        // compute maximum cfl velocity
+        max_vx = fmax(max_vx, fabs(vx) + cs);
+        max_vy = fmax(max_vy, fabs(vy) + cs);
+        max_vz = fmax(max_vz, fabs(vz) + cs);
+
         
       }
     }
@@ -194,4 +209,12 @@ void Grid3D::Apply_Forcing(void)
   free(B3);
   free(B4);
   free(p);
+
+  // compute max inverse of dt
+  max_dti = max_vx / H.dx;
+  max_dti = fmax(max_dti, max_vy / H.dy);
+  max_dti = fmax(max_dti, max_vz / H.dy);
+
+  return max_dti;
+ 
 }

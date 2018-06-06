@@ -15,6 +15,92 @@
 #include "error_handling.h"
 #include "ran.h"
 
+#define N_CL 100
+static Real clusters[N_CL][5];
+
+
+void Grid3D::Set_Cluster_Locations() {
+
+  Real R_s, z_s;
+  Real r_sn, phi_sn, x_sn, y_sn, z_sn;
+  R_s = 0.75; // starburst radius, in kpc
+  //z_s = 0.105; // starburst height, in kpc
+  z_s = 0.01; // starburst height, in kpc
+
+
+  // initialize the random seed
+  srand (1);
+
+  for (int nn=0; nn<N_CL; nn++) {
+
+    r_sn = R_s*float(rand() % 10000)/10000.0; // pick a random radius within R_s
+    phi_sn = 2*PI*float(rand() % 10000)/10000.0; // pick a random phi between 0 and 2pi
+    z_sn = 2*z_s*float(rand() % 10000)/10000.0 - z_s; // pick a random z between -z_s and z_s
+    // convert to cartesian coordinates
+    x_sn = r_sn*cos(phi_sn);
+    y_sn = r_sn*sin(phi_sn);
+
+    clusters[nn][0] = x_sn;
+    clusters[nn][1] = y_sn;
+    clusters[nn][2] = z_sn;
+    clusters[nn][3] = r_sn;
+    clusters[nn][4] = phi_sn;
+
+  }
+
+}
+
+
+void Rotate_Cluster(Real *x_sn, Real *y_sn, Real z_sn, Real r_sn, Real *phi_sn, Real t) {
+
+  Real r_sph, a, v, phi;
+
+  // for halo component, calculate spherical r
+  r_sph = sqrt(*x_sn * *x_sn + *y_sn * *y_sn + z_sn*z_sn);
+
+  // set properties of halo and disk (these must match initial conditions)
+  Real a_disk_r, a_halo, a_halo_r;
+  Real M_vir, M_d, R_vir, R_d, z_d, R_h, M_h, c_vir, phi_0_h, x;
+  // MW model
+  //M_vir = 1.0e12; // viral mass of in M_sun
+  //M_d = 6.5e10; // viral mass of in M_sun
+  //R_d = 3.5; // disk scale length in kpc
+  //z_d = 3.5/5.0; // disk scale height in kpc
+  //R_vir = 261.; // virial radius in kpc
+  //c_vir = 20.0; // halo concentration
+  // M82 model
+  M_vir = 5.0e10; // viral mass of in M_sun
+  M_d = 1.0e10; // mass of disk in M_sun
+  R_d = 0.8; // disk scale length in kpc
+  z_d = 0.15; // disk scale height in kpc
+  R_vir = R_d/0.015; // viral radius in kpc
+  c_vir = 10.0; // halo concentration
+
+  M_h = M_vir - M_d; // halo mass in M_sun
+  R_h = R_vir / c_vir; // halo scale length in kpc
+  phi_0_h = GN * M_h / (log(1.0+c_vir) - c_vir / (1.0+c_vir));
+  x = r_sph / R_h;
+  
+  // calculate acceleration due to NFW halo & Miyamoto-Nagai disk
+  a_halo = - phi_0_h * (log(1+x) - x/(1+x)) / (r_sph*r_sph);
+  a_halo_r = a_halo*(r_sn/r_sph);
+  a_disk_r = - GN * M_d * r_sn * pow(r_sn*r_sn+ pow(R_d + sqrt(z_sn*z_sn + z_d*z_d),2), -1.5);
+  // total acceleration is the sum of the halo + disk components
+  a = fabs(a_halo_r) + fabs(a_disk_r);
+  // radial velocity
+  v = sqrt(r_sn*a);
+  // how far has the cluster gone?
+  // (t was sent to the function in Myr, need kyr for code units)
+  *phi_sn += v*1000*t/r_sn;
+
+  // set new cluster center location
+  *x_sn = r_sn*cos(*phi_sn);
+  *y_sn = r_sn*sin(*phi_sn);
+
+
+}
+
+
 
 //Add a single supernova with 10^51 ergs of thermal energy and 10 M_sun
 Real Grid3D::Add_Supernova(void)
@@ -229,16 +315,18 @@ Real Grid3D::Add_Supernovae(void)
   Real M_dot_tot, E_dot_tot;
   M_dot_tot = E_dot_tot = 0.0;
 
-  //if (H.n_step==0) srand (1); // initialize random seed
-  srand (int(t)/15+1); // change location of clusters every 15 Myr 
+  int ns = int(t)/15; // change location of clusters every 15 Myr
 
-  for (int nn=0; nn<N_cluster; nn++) {
+  for (int nn=ns*N_cluster; nn<(ns+1)*N_cluster; nn++) {
 
-    r_sn = R_s*float(rand() % 10000)/10000.0; // pick a random radius within R_s
-    phi_sn = 2*PI*float(rand() % 10000)/10000.0; // pick a random phi between 0 and 2pi
-    z_sn = 2*z_s*float(rand() % 10000)/10000.0 - z_s; // pick a random z between -z_s and z_s
-    x_sn = r_sn*cos(phi_sn);
-    y_sn = r_sn*sin(phi_sn);
+    // look up the cluster location from the list
+    x_sn = clusters[nn][0];
+    y_sn = clusters[nn][1];
+    z_sn = clusters[nn][2];
+    r_sn = clusters[nn][3];
+    phi_sn = clusters[nn][4];
+    // apply rotation (clusters move with keplarian velocity)
+    Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t-15*ns);
 
     int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
     // identify the global id of the cell containing the cluster center
@@ -301,6 +389,9 @@ Real Grid3D::Add_Supernovae(void)
           #endif
           //M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
           //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot*H.dt;
+          #endif
         }
         // on the sphere
         if (rl < R_c && rr > R_c) {
@@ -325,6 +416,9 @@ Real Grid3D::Add_Supernovae(void)
           //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
           //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
           //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*weight*rho_dot*H.dt;
           #endif
           //M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
           //E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
@@ -532,6 +626,7 @@ Real Grid3D::Add_Supernovae_CC85(void)
   return max_dti;
 
 }
+<<<<<<< HEAD
 
 
 void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th) {

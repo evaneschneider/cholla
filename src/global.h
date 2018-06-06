@@ -91,7 +91,9 @@ struct parameters
   int ny;
   int nz;
   double tout;
-  double outstep;
+  double gridstep;
+  double projstep;
+  double slicestep;
   double histstep;
   Real gamma;
   char init[MAXLEN];

@@ -1055,6 +1055,8 @@ void Grid3D::Disk_3D(parameters p)
         // store internal energy in Energy array
         C.Energy[id] += P/(gama-1.0);
 
+        // add a passive scalar to track gas that was already on the grid
+        C.scalar[id] = 0.0;
       }
     } 
   }

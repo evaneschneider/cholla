@@ -184,6 +184,10 @@ struct Header
   *  \brief Wall time */
   Real t_wall;
 
+  /*! \var out_step
+  *  \brief How often to output data */
+  double out_step;
+
   /*! \var n_step
   *  \brief Number of timesteps taken */
   int n_step;
@@ -423,12 +427,13 @@ class Grid3D
      *  \brief Initialize the grid with a 3D disk following a Miyamoto-Nagai profile. */
     void Disk_3D(parameters P);    
 
-    Apply_Forcing(void);
+    Real Apply_Forcing(void);
     Real Add_Supernova(void);    
     Real Add_Supernovae(void);    
     Real Add_Supernovae_CC85(void);
     void Fix_Cells(void);
     void Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th);
+    void Set_Cluster_Locations(void);
 
     /*! \fn void Set_Boundary_Conditions(parameters P)
      *  \brief Set the boundary conditions based on info in the parameters structure. */

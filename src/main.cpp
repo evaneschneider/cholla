@@ -15,7 +15,9 @@
 #include "error_handling.h"
 
 #define OUTPUT
-#define HIST
+#define TURBULENCE
+//#define SUPERNOVA
+//#define HIST
 //#define CPU_TIME
 
 int main(int argc, char *argv[])
@@ -43,14 +45,21 @@ int main(int argc, char *argv[])
   // input parameter variables
   char *param_file;
   struct parameters P;
-  int nfile = 0; // number of output files
   Real outtime = 0; // current output time
   Real histtime = 0;
 
   // SN timing variables
+  #ifdef SUPERNOVA
   Real sn_dti = 0.0;
   Real dt_SN = 0.1; // time between SN (code units)
   Real t_SN_next = 0.0;
+  #endif
+
+  // turbulence timing variables
+  #ifdef TURBULENCE
+  Real M = 1.0;
+  Real force = 0.1/M;
+  #endif
 
   // read in command line arguments
   if (argc != 2)
@@ -86,8 +95,9 @@ int main(int argc, char *argv[])
     dti = C_cfl / G.H.dt;
     outtime += G.H.t;
     histtime += G.H.t;
-    nfile = P.nfile*P.nfull;
+    #ifdef SUPERNOVA
     t_SN_next += G.H.t;
+    #endif
   }
 
   // set boundary conditions (assign appropriate values to ghost cells)
@@ -104,13 +114,11 @@ int main(int argc, char *argv[])
   if (strcmp(P.init, "Read_Grid") != 0) {
   // write the initial conditions to file
   chprintf("Writing initial conditions to file...\n");
-  WriteData(G, P, nfile);
+  WriteData(G, P);
   }
-  // add one to the output file count
-  nfile++;
   #endif //OUTPUT
   // increment the next output time
-  outtime += P.outstep;
+  outtime += G.H.out_step;
 
   #ifdef HIST
   WriteHistory(G, P);
@@ -147,6 +155,7 @@ int main(int argc, char *argv[])
       G.H.dt = outtime - G.H.t;
     }
 
+    #ifdef SUPERNOVA
     // Add supernovae
     //sn_dti = G.Add_Supernovae_CC85();
     //sn_dti = G.Add_Supernovae();
@@ -160,6 +169,14 @@ int main(int argc, char *argv[])
 
     #ifdef MPI_CHOLLA
     G.H.dt = ReduceRealMin(G.H.dt);
+    #endif
+    #endif //SUPERNOVA
+
+    #ifdef TURBULENCE
+    if (G.H.t >= force) {
+      G.Apply_Forcing();
+      force += 0.1/M;
+    }
     #endif
    
 
@@ -225,13 +242,11 @@ int main(int argc, char *argv[])
     {
       #ifdef OUTPUT
       /*output the grid data*/
-      WriteData(G, P, nfile);
+      WriteData(G, P);
       // add one to the output file count
-      nfile++;
       #endif //OUTPUT
       // update to the next output time
-      outtime += P.outstep;      
-
+      outtime += G.H.out_step;      
     }
     #ifdef HIST
     if (G.H.t >= histtime) {

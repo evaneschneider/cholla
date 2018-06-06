@@ -34,7 +34,6 @@
 #endif
 
 
-
 /*! \fn Grid3D(void)
  *  \brief Constructor for the Grid. */
 Grid3D::Grid3D(void)
@@ -108,6 +107,15 @@ void Grid3D::Initialize(struct parameters *P)
 
   // Set the CFL coefficient (a global variable)
   C_cfl = 0.1;
+
+  // Set the output timestep
+  H.out_step = P->gridstep;
+  #ifdef PROJECTION
+  H.out_step = fmin(P->projstep, H.out_step);
+  #endif
+  #ifdef SLICES
+  H.out_step = fmin(P->slicestep, H.out_step);
+  #endif
 
 #ifndef MPI_CHOLLA
 
@@ -240,7 +248,9 @@ void Grid3D::AllocateMemory(void)
   #ifdef CLOUDY_COOL
   //printf("Warning: Cloudy cooling isn't currently working. No cooling will be applied.\n");
   Load_Cuda_Textures();
-  #endif  
+  #endif
+
+  Set_Cluster_Locations();
 
 }
 
@@ -625,4 +635,5 @@ void Grid3D::FreeMemory(void)
   Free_Cuda_Textures();
   #endif
   #endif
+
 }
