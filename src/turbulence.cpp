@@ -15,7 +15,7 @@ Real Grid3D::Apply_Forcing(void)
   int n_cells = H.nx_real * H.ny_real * H.nz_real;  
   int istart, jstart, kstart, iend, jend, kend;
   Real x_pos, y_pos, z_pos;
-  Real *A1, *A2, *A3, *A4, *B1, *B2, *B3, *B4;
+  Real A1[3], A2[3], A3[3], A4[3], B1[3], B2[3], B3[3], B4[3];
   Real *vxp, *vyp, *vzp;
   Real *p;
   Real mxp, myp, mzp;
@@ -25,23 +25,26 @@ Real Grid3D::Apply_Forcing(void)
   Real mx, my, mz;
   Real vx, vy, vz, P, d_inv, cs, max_vx, max_vy, max_vz, max_dti;
   Real M, d_tot;  
-  A1 = rng_direction(3);
-  A2 = rng_direction(3);
-  A3 = rng_direction(3);
-  A4 = rng_direction(3);
-  B1 = rng_direction(3);
-  B2 = rng_direction(3);
-  B3 = rng_direction(3);
-  B4 = rng_direction(3);
-  p = rng_direction(3);
+  srand(int(H.t));
+  for (int ii=0; ii<3; ii++) {
+    A1[ii] = (rand() % 1000000 / 1000000.) 
+    A2[ii] = (rand() % 1000000 / 1000000.) 
+    A3[ii] = (rand() % 1000000 / 1000000.) 
+    A4[ii] = (rand() % 1000000 / 1000000.) 
+    B1[ii] = (rand() % 1000000 / 1000000.) 
+    B2[ii] = (rand() % 1000000 / 1000000.) 
+    B3[ii] = (rand() % 1000000 / 1000000.) 
+    B4[ii] = (rand() % 1000000 / 1000000.) 
+    p[ii]  = (rand() % 1000000 / 1000000.) 
+  }
   vxp = (Real *) malloc(n_cells*sizeof(Real));
   vyp = (Real *) malloc(n_cells*sizeof(Real));
   vzp = (Real *) malloc(n_cells*sizeof(Real));
   
-  //printf("%f %f %f\n", A1[0], A1[1], A1[2]);
-  //printf("%f %f %f\n", B1[0], B1[1], B1[2]);
-  //printf("%f %f %f\n", A2[0], A2[1], A2[2]);
-  //printf("%f %f %f\n", B2[0], B2[1], B2[2]);
+  printf("%f %f %f\n", A1[0], A1[1], A1[2]);
+  printf("%f %f %f\n", B1[0], B1[1], B1[2]);
+  printf("%f %f %f\n", A2[0], A2[1], A2[2]);
+  printf("%f %f %f\n", B2[0], B2[1], B2[2]);
   //set the desired Mach number
   M = 1.0;
   d_tot = 0;
