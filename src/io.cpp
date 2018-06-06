@@ -631,8 +631,13 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
 
   // Close the dataspace
   status = H5Sclose(dataspace_id);
+  #ifdef MPI_CHOLLA
+  if (status < 0) {printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
+  #else
+  if (status < 0) {printf("OutputRotatedProjectedData: File write failed.\n"); exit(-1); }
+  #endif
 
-  chprintf("Outputting rotation data with delta = %e, theta = %e, phi = %e, Lx = %f, Lz = %f\n",R.delta,R.theta,R.phi,R.Lx,R.Lz);
+  //chprintf("Outputting rotation data with delta = %e, theta = %e, phi = %e, Lx = %f, Lz = %f\n",R.delta,R.theta,R.phi,R.Lx,R.Lz);
 
 }
 #endif
