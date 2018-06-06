@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 
   // turbulence timing variables
   #ifdef TURBULENCE
+  Real t_dti = 0.0;
   Real M = 1.0;
   Real force = 0.1/M;
   #endif
@@ -166,7 +167,6 @@ int main(int argc, char *argv[])
     if (sn_dti > 0) {
       G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
     }
-
     #ifdef MPI_CHOLLA
     G.H.dt = ReduceRealMin(G.H.dt);
     #endif
@@ -174,9 +174,15 @@ int main(int argc, char *argv[])
 
     #ifdef TURBULENCE
     if (G.H.t >= force) {
-      G.Apply_Forcing();
+      t_dti = G.Apply_Forcing();
       force += 0.1/M;
     }
+    if (t_dti > 0) {
+      G.H.dt = fmin(G.H.dt, C_cfl/t_dti);
+    }
+    #ifdef MPI_CHOLLA
+    G.H.dt = ReduceRealMin(G.H.dt);
+    #endif
     #endif
    
 
