@@ -423,6 +423,7 @@ class Grid3D
      *  \brief Initialize the grid with a 3D disk following a Miyamoto-Nagai profile. */
     void Disk_3D(parameters P);    
 
+    Apply_Forcing(void);
     Real Add_Supernova(void);    
     Real Add_Supernovae(void);    
     Real Add_Supernovae_CC85(void);
