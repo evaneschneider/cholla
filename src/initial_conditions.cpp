@@ -385,7 +385,7 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
       }
     }
   }
-  printf("%f\n", rho_av / (256*256*256));
+  printf("%f\n", rho_av / (512*256*256));
 
 }
 

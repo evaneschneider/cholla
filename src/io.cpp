@@ -36,15 +36,19 @@ void WriteData(Grid3D G, struct parameters P, int nfile)
 /* Output the history variables to file. */
 void WriteHistory(Grid3D G, struct parameters P)
 {
-  Real bubble_radius, bubble_mass, bubble_energy, bubble_energy_th;
+  Real bubble_radius, bubble_volume, bubble_mass, bubble_energy, bubble_energy_th;
 
-  G.Analysis_Functions(&bubble_radius, &bubble_mass, &bubble_energy, &bubble_energy_th);
+  G.Analysis_Functions(&bubble_volume, &bubble_mass, &bubble_energy, &bubble_energy_th);
 
   #ifdef MPI_CHOLLA
   MPI_Barrier(world);
   ReduceRealSum(bubble_mass);
+  ReduceRealSum(bubble_energy);
+  ReduceRealSum(bubble_energy_th);
+  ReduceRealSum(bubble_volume);
   if (procID == 0) {
   #endif 
+  bubble_radius = pow(0.75*bubble_volume/PI, (1./3.));
 
   char filename[100];
 

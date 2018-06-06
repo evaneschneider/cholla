@@ -25,18 +25,20 @@ Real Grid3D::Add_Supernova(void)
   Real xl, xr, yl, yr, zl, zr, rl, rr;
   int incount, ii;
   Real weight, xpoint, ypoint, zpoint;
-  //R_s = 2*H.dx; // supernova radius, pc
-  R_s = 5; // supernova radius, pc
-  M = 15.0; // mass input, in M_sun
+  R_s = 4*H.dx; // supernova radius, pc
+  M = 10.0; // mass input, in M_sun
   E = 1.0e51; // energy input, in erg
   Real x_sn, y_sn, z_sn; // central location of SN
   x_sn = y_sn = z_sn = 0;
   Real R_cl = 2.0; // size of cluster, pc (for random distribution of SN)
-  srand (int(H.t)); // change location of SN
-  x_sn = 2*R_cl*float(rand() % 10000)/10000.0 - R_cl; // pick a random z between -R_cl and R_cl
-  y_sn = 2*R_cl*float(rand() % 10000)/10000.0 - R_cl; // pick a random z between -R_cl and R_cl
-  z_sn = 2*R_cl*float(rand() % 10000)/10000.0 - R_cl; // pick a random z between -R_cl and R_cl
-  printf("%f %f %f\n", x_sn, y_sn, z_sn);
+  //srand (int(H.t)); // change location of SN
+  //x_sn = 2*R_cl*float(rand() % 10000)/10000.0 - R_cl; // pick a random z between -R_cl and R_cl
+  //y_sn = 2*R_cl*float(rand() % 10000)/10000.0 - R_cl; // pick a random z between -R_cl and R_cl
+  //z_sn = 2*R_cl*float(rand() % 10000)/10000.0 - R_cl; // pick a random z between -R_cl and R_cl
+  //printf("%f %f %f\n", x_sn, y_sn, z_sn);
+  x_sn = 0.0;
+  y_sn = 0.0;
+  z_sn = 0.0;
 
   Real max_dti = 0;
 
@@ -532,9 +534,9 @@ Real Grid3D::Add_Supernovae_CC85(void)
 }
 
 
-void Grid3D::Analysis_Functions(Real *bubble_radius, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th) {
+void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th) {
 
-  *bubble_radius = 0.0;
+  *bubble_volume = 0.0;
   *bubble_mass = 0.0;
   *bubble_energy = 0.0;
   *bubble_energy_th = 0.0;
@@ -542,7 +544,7 @@ void Grid3D::Analysis_Functions(Real *bubble_radius, Real *bubble_mass, Real *bu
   Real d, mx, my, mz, P, E, gE;
   Real vx, vy, vz, v, n, T, mu, V;
   Real v_to_kmps = LENGTH_UNIT/TIME_UNIT/1e5;
-  Real e_s = MASS_UNIT*LENGTH_UNIT*LENGTH_UNIT / (TIME_UNIT*TIME_UNIT) / 1e51;
+  Real e_s = MASS_UNIT*LENGTH_UNIT*LENGTH_UNIT / (TIME_UNIT*TIME_UNIT);
   int n_bub = 0;
   mu = 1.27;
 
@@ -575,8 +577,8 @@ void Grid3D::Analysis_Functions(Real *bubble_radius, Real *bubble_mass, Real *bu
         // cell is counted as being in the bubble
         if (T > 1e5 || v*v_to_kmps > 1.5) {
           n_bub++;
-          *bubble_energy += E;
-          *bubble_energy_th += gE;
+          *bubble_energy += E*H.dx*H.dy*H.dz*e_s;
+          *bubble_energy_th += gE*H.dx*H.dy*H.dz*e_s;
 
         }
         if (T > 1e5) {
@@ -586,9 +588,6 @@ void Grid3D::Analysis_Functions(Real *bubble_radius, Real *bubble_mass, Real *bu
       }
     }
   }
-  V = n_bub*H.dx*H.dy*H.dz;
-  *bubble_radius = pow(0.75*V/PI, (1./3.));
-  *bubble_energy = *bubble_energy * V * e_s;
-  *bubble_energy_th = *bubble_energy_th * V * e_s;
+  *bubble_volume = n_bub*H.dx*H.dy*H.dz;
 
 }

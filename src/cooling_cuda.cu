@@ -385,7 +385,7 @@ __device__ Real TI_cool(Real n, Real T)
   Real lambda = 0.0; //cooling rate, erg s^-1 cm^3
   Real  H = 0.0; //heating rate, erg s^-1
   Real cool = 0.0; //cooling per unit volume, erg /s / cm^3
-  Real n_av = 1.0; //mean density in the sim volume
+  Real n_av = 100.0; //mean density in the sim volume
 
   // Below 10K only include photoelectric heating
   if (log10(T) < 1.0) {

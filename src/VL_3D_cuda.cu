@@ -175,6 +175,10 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
     // Step 3: Update the conserved variables half a timestep 
     Update_Conserved_Variables_3D_half<<<dim1dGrid,dim1dBlock>>>(dev_conserved, dev_conserved_half, F_x, F_y, F_z, nx_s, ny_s, nz_s, n_ghost, dx, dy, dz, 0.5*dt, gama, n_fields);
     CudaCheckError();
+    #ifdef COOLING_GPU
+    cooling_kernel<<<dim1dGrid,dim1dBlock>>>(dev_conserved_half, nx_s, ny_s, nz_s, n_ghost, n_fields, 0.5*dt, gama, dev_dt_array);  
+    CudaCheckError();
+    #endif
 
 
     // Step 4: Construct left and right interface values using updated conserved variables
@@ -277,7 +281,7 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
       min_dt = fmin(min_dt, host_dt_array[i]);
     }  
     if (min_dt < C_cfl/max_dti) {
-      printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
+      //printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
       max_dti = C_cfl/min_dt;
     }
     #endif
