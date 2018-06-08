@@ -626,22 +626,16 @@ Real Grid3D::Add_Supernovae_CC85(void)
   return max_dti;
 
 }
-<<<<<<< HEAD
 
 
-void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th) {
+void Grid3D::Analysis_Functions(Real *total_energy, Real *thermal_energy) {
 
-  *bubble_volume = 0.0;
-  *bubble_mass = 0.0;
-  *bubble_energy = 0.0;
-  *bubble_energy_th = 0.0;
+  *total_energy = 0.0;
+  *thermal_energy = 0.0;
 
   Real d, mx, my, mz, P, E, gE;
   Real vx, vy, vz, v, n, T, mu, V;
-  Real v_to_kmps = LENGTH_UNIT/TIME_UNIT/1e5;
-  Real e_s = MASS_UNIT*LENGTH_UNIT*LENGTH_UNIT / (TIME_UNIT*TIME_UNIT);
-  int n_bub = 0;
-  mu = 1.27;
+  mu = 0.6;
 
   for (int k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
     for (int j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
@@ -668,21 +662,11 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
         gE = P/(gama-1.0);
         T = P*PRESSURE_UNIT/(n*KB);
         #endif
-
-        // cell is counted as being in the bubble
-        if (T > 1e5 || v*v_to_kmps > 1.5) {
-          n_bub++;
-          *bubble_energy += E*H.dx*H.dy*H.dz*e_s;
-          *bubble_energy_th += gE*H.dx*H.dy*H.dz*e_s;
-
-        }
-        if (T > 1e5) {
-          *bubble_mass += d*H.dx*H.dy*H.dz;
-        }
+        *total_energy += E*H.dx*H.dy*H.dz;
+        *thermal_energy += gE*H.dx*H.dy*H.dz;
 
       }
     }
   }
-  *bubble_volume = n_bub*H.dx*H.dy*H.dz;
 
 }

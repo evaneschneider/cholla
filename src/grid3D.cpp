@@ -497,7 +497,7 @@ void Grid3D::Fix_Cells(void)
   int i, j, k, id;
   Real d, mx, my, mz, P, E;
   Real n, T, mu;
-  mu = 1.27;
+  mu = 0.6;
 
   for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
     for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {

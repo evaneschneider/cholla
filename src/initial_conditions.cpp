@@ -132,6 +132,13 @@ void Grid3D::Constant(Real rho, Real vx, Real vy, Real vz, Real P)
   int i, j, k, id;
   int istart, jstart, kstart, iend, jend, kend;
   Real x_pos, y_pos, z_pos;
+  Real mu, n, T;
+  mu = 0.6;
+  rho = rho*mu*MP / DENSITY_UNIT;
+  n = rho*DENSITY_UNIT / (mu*MP);
+  P = P*n*KB / PRESSURE_UNIT;
+  T = P*PRESSURE_UNIT / (n*KB);
+  printf("n = %f, T = %f\n", n, T);
 
   istart = H.n_ghost;
   iend   = H.nx-H.n_ghost;
@@ -365,7 +372,9 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
         C.momentum_y[id] = 0.0;
         C.momentum_z[id] = 0.0;
         C.Energy[id]     = P/(gama-1.0);
+        #ifdef DE
         C.GasEnergy[id]  = P/(gama-1.0);
+        #endif
         // add density perturbations
         for (int ii=0; ii<6; ii++) {
           for (int jj=0; jj<6; jj++) {

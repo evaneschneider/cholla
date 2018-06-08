@@ -55,8 +55,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
   Real T_min = 1.0e1; // minimum temperature allowed
   Real T_max = 1.0e9; // minimum temperature allowed
 
-  //mu = 0.6;
-  mu = 1.27;
+  mu = 0.6;
+  //mu = 1.27;
 
   // get a global thread ID
   int blockId = blockIdx.x + blockIdx.y*gridDim.x;
@@ -108,8 +108,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     //if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
     // call the cooling function
     //cool = CIE_cool(n, T); 
-    //cool = Cloudy_cool(n, T); 
-    cool = TI_cool(n, T);
+    cool = Cloudy_cool(n, T); 
+    //cool = TI_cool(n, T);
     
     // calculate change in temperature given dt
     del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
@@ -125,8 +125,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
       dt -= dt_sub;
       // calculate cooling again
       //cool = CIE_cool(n, T);
-      //cool = Cloudy_cool(n, T);
-      cool = TI_cool(n, T);
+      cool = Cloudy_cool(n, T);
+      //cool = TI_cool(n, T);
       // calculate new change in temperature
       del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
       loop++;
@@ -153,8 +153,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     #endif
     // calculate cooling rate for new T
     //cool = CIE_cool(n, T);
-    //cool = Cloudy_cool(n, T);
-    cool = TI_cool(n, T);
+    cool = Cloudy_cool(n, T);
+    //cool = TI_cool(n, T);
     // only use good cells in timestep calculation (in case some have crashed)
     if (n > 0 && T > 0 && cool > 0.0) {
       // limit the timestep such that delta_T is 10% 
@@ -364,10 +364,10 @@ __device__ Real Cloudy_cool(Real n, Real T)
 #ifdef CLOUDY_COOL
   // don't cool below 10 K
   if (log10(T) > 1.0) {
-  lambda = tex2D<float>(coolTexObj, log_T, log_n);
+  lambda = tex2D(coolTexObj, log_T, log_n);
   }
   else lambda = 0.0;
-  H = tex2D<float>(heatTexObj, log_T, log_n);
+  H = tex2D(heatTexObj, log_T, log_n);
 #endif
 
   // cooling rate per unit volume

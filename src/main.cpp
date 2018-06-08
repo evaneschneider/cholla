@@ -17,7 +17,7 @@
 #define OUTPUT
 #define TURBULENCE
 //#define SUPERNOVA
-//#define HIST
+#define HIST
 //#define CPU_TIME
 
 int main(int argc, char *argv[])
@@ -58,8 +58,7 @@ int main(int argc, char *argv[])
   // turbulence timing variables
   #ifdef TURBULENCE
   Real t_dti = 0.0;
-  Real M = 1.0;
-  Real force = 0.1/M;
+  Real force = 0.0;
   #endif
 
   // read in command line arguments
@@ -98,6 +97,9 @@ int main(int argc, char *argv[])
     histtime += G.H.t;
     #ifdef SUPERNOVA
     t_SN_next += G.H.t;
+    #endif
+    #ifdef TURBULENCE
+    force += 10000;
     #endif
   }
 
@@ -175,10 +177,12 @@ int main(int argc, char *argv[])
     #ifdef TURBULENCE
     if (G.H.t >= force) {
       t_dti = G.Apply_Forcing();
-      force += 0.1/M;
+      force += 1000;
     }
     if (t_dti > 0) {
+      printf("%e %e\n", G.H.dt, C_cfl/t_dti);
       G.H.dt = fmin(G.H.dt, C_cfl/t_dti);
+      t_dti = 0;
     }
     #ifdef MPI_CHOLLA
     G.H.dt = ReduceRealMin(G.H.dt);
