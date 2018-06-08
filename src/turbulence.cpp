@@ -31,6 +31,7 @@ Real Grid3D::Apply_Forcing(void)
   M = int(H.t/1000.0);
   srand(M+2);
   f = exp(-H.t/1000.0+M);
+  printf("%f %f\n", f, sqrt(1-f*f));
   for (int ii=0; ii<3; ii++) {
     A1[ii] = (rand() % 1000000 / 1000000.); 
     A2[ii] = (rand() % 1000000 / 1000000.); 
@@ -60,8 +61,10 @@ Real Grid3D::Apply_Forcing(void)
   vzp = (Real *) malloc(n_cells*sizeof(Real));
   //printf("%d %f %f\n", M, f, sqrt(1-f*f));
   
-  //printf("%f %f %f\n", B1[0], B1[1], B1[2]);
-  //printf("%f %f %f\n", B3[0], B3[1], B3[2]);
+  printf("%f %f %f\n", B1[0], B1[1], B1[2]);
+  printf("%f %f %f\n", B2[0], B2[1], B2[2]);
+  printf("%f %f %f\n", B3[0], B3[1], B3[2]);
+  printf("%f %f %f\n", B4[0], B4[1], B4[2]);
   d_tot = 0;
   istart = H.n_ghost;
   iend   = H.nx-H.n_ghost;

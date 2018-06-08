@@ -285,7 +285,7 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
       min_dt = fmin(min_dt, host_dt_array[i]);
     }  
     if (min_dt < C_cfl/max_dti) {
-      //printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
+      printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
       max_dti = C_cfl/min_dt;
     }
     //max_dti = fmin(C_cfl, max_dti);

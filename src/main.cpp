@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     t_SN_next += G.H.t;
     #endif
     #ifdef TURBULENCE
-    force += 10000;
+    force += G.H.t;
     #endif
   }
 
