@@ -50,6 +50,19 @@ void Grid3D::Set_Cluster_Locations() {
 
 }
 
+void Get_Loading(Real *M_dot, Real *E_dot, Real t) {
+
+  if (t < 0.1) {
+   *M_dot = 1.2e3*exp(-powf((t-0.05)**2/(2*0.028**2),2));
+   *E_dot = 4e41*t*t / (t*t + 0.05*t);
+  }
+  else {
+    *M_dot = 100;;
+    *E_dot = 3.0e41;
+  }
+
+}
+
 
 void Rotate_Cluster(Real *x_sn, Real *y_sn, Real z_sn, Real r_sn, Real *phi_sn, Real t) {
 
@@ -244,8 +257,318 @@ Real Grid3D::Add_Supernova(void)
 
 }
 
-
+// Add feedback from clustered superovae according to the mass
+// and energy rate tables from superbubble calculations
 Real Grid3D::Add_Supernovae(void)
+{
+  int i, j, k, id;
+  Real x_pos, y_pos, z_pos, r, R_s, z_s, R_c, f, t, t1, t2, t3;
+  Real M_dot[20], E_dot[20], V, rho_dot[20], Ed_dot[20];
+  Real r_sn, phi_sn, x_sn, y_sn, z_sn;
+  Real xl, xr, yl, yr, zl, zr, rl, rr;
+  int incount, ii;
+  Real weight, xpoint, ypoint, zpoint;
+  Real SFR, E_sn;
+  int N_sn, nx_sn, ny_sn, nz_sn;
+  int N_cluster;
+  int nn = 0;
+  SFR = 20.0; // star formation rate, in M_sun / yr
+  R_c = 0.06; // cluster radius, in kpc
+  M_dot = 1.2e4;
+  E_dot = 5.4e42;
+  N_cluster = 20;
+  Real t_sn[20];
+
+  Real max_dti = 0;
+
+  // start feedback after 5 Myr, ramp up for 5 Myr, high for 30 Myr, ramp down for 5 Myr
+  t = H.t/1000;
+  if (t >= 5 && t < 10) {
+    ns = 0; N_cluster = 10; // clusters 0 - 9 
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 5;
+    }
+  }
+  if (t >= 10 && t < 15) {
+    ns = 0; N_cluster = 20; // clusters 0 - 19 
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 5;
+    }
+    for (nn = 10; nn < 20; nn++) {
+      t_sn[nn] = t - 10;
+    }    
+  }
+  if (t >= 15 && t < 20) {
+    ns = 10; N_cluster = 20; // clusters 10 - 29 
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 10;
+    }
+    for (nn = 10; nn < 20; nn++) {
+      t_sn[nn] = t - 15;
+    }      
+  }
+  if (t >= 20 && t < 25) {
+    ns = 20; N_cluster = 20; // clusters 20 - 39 
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 15;
+    }
+    for (nn = 10; nn < 20; nn++) {
+      t_sn[nn] = t - 20;
+    }    
+  }
+  if (t >= 25 && t < 30) {
+    ns = 30; N_cluster = 20; // clusters 30 - 49
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 20;
+    }
+    for (nn = 10; nn < 20; nn++) {
+      t_sn[nn] = t - 25;
+    }    
+  }
+  if (t >= 30 && t < 35) {
+    ns = 40; N_cluster = 20; // clusters 40 - 59 
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 25;
+    }
+    for (nn = 10; nn < 20; nn++) {
+      t_sn[nn] = t - 30;
+    }    
+  }
+  if (t >= 35 && t < 40) {
+    ns = 50; N_cluster = 13; // clusters 50 - 62 
+    for (nn = 0; nn < 10; nn++) {
+      t_sn[nn] = t - 30;
+    }
+    for (nn = 10; nn < 13; nn++) {
+      t_sn[nn] = t - 35;
+    }    
+  }
+  if (t >= 40 && t < 45) {
+    ns = 60; N_cluster = 5; // clusters 60 - 64
+    for (nn = 0; nn < 3; nn++) {
+      t_sn[nn] = t - 35;
+    }
+    for (nn = 3; nn < 5; nn++) {
+      t_sn[nn] = t - 40;
+    }     
+  }
+  if (t >= 45 && t < 50) {
+    ns = 63; N_cluster = 5; // clusters 63 - 67
+    for (nn = 0; nn < 2; nn++) {
+      t_sn[nn] = t - 40;
+    }
+    for (nn = 2; nn < 5; nn++) {
+      t_sn[nn] = t - 45;
+    }      
+  }
+  if (t >= 50 && t < 55) {
+    ns = 65; N_cluster = 5; // clusters 65 - 69
+    for (nn = 0; nn < 3; nn++) {
+      t_sn[nn] = t - 45;
+    }
+    for (nn = 3; nn < 5; nn++) {
+      t_sn[nn] = t - 50;
+    }    
+  }
+  if (t >= 55 && t < 60) {
+    ns = 68; N_cluster = 5; // clusters 68 - 72 
+    for (nn = 0; nn < 2; nn++) {
+      t_sn[nn] = t - 50;
+    }
+    for (nn = 2; nn < 5; nn++) {
+      t_sn[nn] = t - 55;
+    }    
+  }
+  if (t >= 60 && t < 65) {
+    ns = 70; N_cluster = 5; // clusters 70 - 74
+    for (nn = 0; nn < 3; nn++) {
+      t_sn[nn] = t - 55;
+    }
+    for (nn = 3; nn < 5; nn++) {
+      t_sn[nn] = t - 60;
+    }    
+  }
+  if (t >= 65 && t < 70) {
+    ns = 73; N_cluster = 2; // clusters 73 -74 
+    for (nn = 0; nn < 2; nn++) {
+      t_sn[nn] = t - 60;
+    }
+  }
+  if (t >= 70) {
+    ns = 75; N_cluster = 0; // no clusters 
+  }
+
+  // calculate the volume of a cluster
+  V = (4.0/3.0)*PI*R_c*R_c*R_c;
+  // one cell is what fraction of that volume?
+  f = H.dx*H.dy*H.dz / V;
+
+  // Call function to get M_dot and E_dot for each cluster here
+  for (nn = 0; nn<N_cluster) {
+    Get_Loading(&M_dot[nn], &E_dot[nn], t_sn[nn]);
+    if (nn == 0) printf("%e %e\n", M_dot[0], E_dot[0]);
+    E_dot[nn] = E_dot[nn]*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
+    rho_dot[nn] = f * M_dot[nn] / (H.dx*H.dy*H.dz);
+    Ed_dot[nn] = f * E_dot[nn] / (H.dx*H.dy*H.dz);
+  }
+  
+
+  Real d_inv, vx, vy, vz, P, cs;
+  Real max_vx, max_vy, max_vz;
+  max_dti = max_vx = max_vy = max_vz = 0.0;
+  Real M_dot_tot, E_dot_tot;
+  M_dot_tot = E_dot_tot = 0.0;
+
+
+  for (int nn=ns; nn< ns+N_cluster; nn++) {
+
+    // look up the cluster location from the list
+    x_sn = clusters[nn][0];
+    y_sn = clusters[nn][1];
+    z_sn = clusters[nn][2];
+    r_sn = clusters[nn][3];
+    phi_sn = clusters[nn][4];
+    // apply rotation (clusters move with keplarian velocity)
+    Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t_sn[nn]);
+
+    int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
+    // identify the global id of the cell containing the cluster center
+    xid_sn = int((x_sn + 0.5*H.xdglobal)/H.dx);
+    yid_sn = int((y_sn + 0.5*H.ydglobal)/H.dx);
+    zid_sn = int((z_sn + 0.5*H.zdglobal)/H.dx);
+    // how many cells to loop through around the center
+    nl_x = ceil(R_c/H.dx);
+    nl_y = ceil(R_c/H.dy);
+    nl_z = ceil(R_c/H.dz);
+    //chprintf("x: %f y: %f z: %f xid: %d yid: %d zid: %d nx: %d ny: %d nz: %d\n", x_sn, y_sn, z_sn, xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z);
+
+    for (int kk=zid_sn-nl_z; kk<=zid_sn+nl_z; kk++) {
+    for (int jj=yid_sn-nl_y; jj<=yid_sn+nl_y; jj++) {
+    for (int ii=xid_sn-nl_x; ii<=xid_sn+nl_x; ii++) {
+
+      // is this cell in your domain?
+      #ifdef MPI_CHOLLA
+      if (ii >= nx_local_start && ii < nx_local_start+nx_local && jj >= ny_local_start && jj < ny_local_start+ny_local && kk >= nz_local_start && kk < nz_local_start+nz_local) 
+      {
+      #endif
+        i = ii + H.n_ghost;
+        j = jj + H.n_ghost;
+        k = kk + H.n_ghost;
+        #ifdef MPI_CHOLLA
+        i -= nx_local_start;
+        j -= ny_local_start;
+        k -= nz_local_start;
+        #endif
+
+        //printf("procID: %d  ig: %d  jg: %d  kg: %d  il: %d  jl: %d  kl: %d\n", procID, ii, jj, kk, i, j, k);
+
+        // Call function to get M_dot and E_dot here
+
+        // local domain cell id
+        id = i + j*H.nx + k*H.nx*H.ny;
+        // global position
+        Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
+        
+        // calculate radius from the cluster center
+        xl = fabs(x_pos-x_sn)-0.5*H.dx;
+        yl = fabs(y_pos-y_sn)-0.5*H.dy;
+        zl = fabs(z_pos-z_sn)-0.5*H.dz;
+        xr = fabs(x_pos-x_sn)+0.5*H.dx;
+        yr = fabs(y_pos-y_sn)+0.5*H.dy;
+        zr = fabs(z_pos-z_sn)+0.5*H.dz;
+        rl = sqrt(xl*xl + yl*yl + zl*zl);
+        rr = sqrt(xr*xr + yr*yr + zr*zr);
+        r = sqrt((x_pos-x_sn)*(x_pos-x_sn) + (y_pos-y_sn)*(y_pos-y_sn) + (z_pos-z_sn)*(z_pos-z_sn));
+
+        // within cluster radius, inject mass and thermal energy
+        // entire cell is within sphere
+        if (rr < R_c) {
+        //if (r < R_c) {
+          C.density[id] += rho_dot[nn] * H.dt;
+          C.Energy[id] += Ed_dot[nn] * H.dt;
+          #ifdef DE
+          C.GasEnergy[id] += Ed_dot[nn] * H.dt;
+          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+          //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+          #endif
+          //M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
+          //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot[nn]*H.dt;
+          #endif
+        }
+        // on the sphere
+        if (rl < R_c && rr > R_c) {
+          // quick Monte Carlo to determine weighting
+          Ran quickran(50);
+          incount = 0;
+          for (int mm=0; mm<1000; mm++) {
+            // generate a random number between x_pos and dx
+            xpoint = xl + H.dx*quickran.doub();
+            // generate a random number between y_pos and dy
+            ypoint = yl + H.dy*quickran.doub();
+            // generate a random number between z_pos and dz
+            zpoint = zl + H.dz*quickran.doub();
+            // check to see whether the point is within the sphere 
+            if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_c*R_c) incount++;
+          }
+          weight = incount / 1000.0;
+          C.density[id] += rho_dot[nn] * H.dt * weight;
+          C.Energy[id]  += Ed_dot[nn] * H.dt * weight;
+          #ifdef DE
+          C.GasEnergy[id] += Ed_dot[nn] * H.dt * weight;
+          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+          //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*weight*rho_dot[nn]*H.dt;
+          #endif
+          //M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
+          //E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
+        }
+        // recalculate the timestep for these cells
+        d_inv = 1.0 / C.density[id];
+        vx = d_inv * C.momentum_x[id];
+        vy = d_inv * C.momentum_y[id];
+        vz = d_inv * C.momentum_z[id];
+        P = fmax((C.Energy[id] - 0.5*C.density[id]*(vx*vx + vy*vy + vz*vz) )*(gama-1.0), TINY_NUMBER);
+        cs = sqrt(d_inv * gama * P);
+        // compute maximum cfl velocity
+        max_vx = fmax(max_vx, fabs(vx) + cs);
+        max_vy = fmax(max_vy, fabs(vy) + cs);
+        max_vz = fmax(max_vz, fabs(vz) + cs);
+      #ifdef MPI_CHOLLA
+      }
+      #endif
+    }
+    }
+    }
+
+  }
+
+  /*
+  printf("procID: %d M_dot: %e E_dot: %e\n", procID, M_dot_tot, E_dot_tot);
+  MPI_Barrier(MPI_COMM_WORLD);
+  Real global_M_dot, global_E_dot;
+  MPI_Reduce(&M_dot_tot, &global_M_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&E_dot_tot, &global_E_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
+  chprintf("Total M_dot: %e E_dot: %e \n", global_M_dot, global_E_dot); 
+  */
+
+  // compute max inverse of dt
+  max_dti = max_vx / H.dx;
+  max_dti = fmax(max_dti, max_vy / H.dy);
+  max_dti = fmax(max_dti, max_vz / H.dy);
+
+  }
+
+  return max_dti;
+
+}
+
+Real Grid3D::Add_Supernovae_old(void)
 {
   int i, j, k, id;
   Real x_pos, y_pos, z_pos, r, R_s, z_s, R_c, f, t, t1, t2, t3;
@@ -322,7 +645,7 @@ Real Grid3D::Add_Supernovae(void)
     z_sn = clusters[nn][2];
     r_sn = clusters[nn][3];
     phi_sn = clusters[nn][4];
-    // apply rotation (clusters move with keplarian velocity)
+    // apply rotation (clusters move according to the disk + halo potential)
     Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t-15*ns);
 
     int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
