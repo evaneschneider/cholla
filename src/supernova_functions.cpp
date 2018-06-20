@@ -53,7 +53,7 @@ void Grid3D::Set_Cluster_Locations() {
 void Get_Loading(Real *M_dot, Real *E_dot, Real t) {
 
   if (t < 0.1) {
-   *M_dot = 1.2e3*exp(-powf((t-0.05)**2/(2*0.028**2),2));
+   *M_dot = 1.2e3*exp(-powf(powf((t-0.05),2)/(2*powf(0.028,2)),2));
    *E_dot = 4e41*t*t / (t*t + 0.05*t);
   }
   else {
@@ -272,10 +272,9 @@ Real Grid3D::Add_Supernovae(void)
   int N_sn, nx_sn, ny_sn, nz_sn;
   int N_cluster;
   int nn = 0;
+  int ns = 0;
   SFR = 20.0; // star formation rate, in M_sun / yr
   R_c = 0.06; // cluster radius, in kpc
-  M_dot = 1.2e4;
-  E_dot = 5.4e42;
   N_cluster = 20;
   Real t_sn[20];
 
@@ -398,13 +397,14 @@ Real Grid3D::Add_Supernovae(void)
     ns = 75; N_cluster = 0; // no clusters 
   }
 
+
   // calculate the volume of a cluster
   V = (4.0/3.0)*PI*R_c*R_c*R_c;
   // one cell is what fraction of that volume?
   f = H.dx*H.dy*H.dz / V;
 
   // Call function to get M_dot and E_dot for each cluster here
-  for (nn = 0; nn<N_cluster) {
+  for (nn = 0; nn<N_cluster; nn++) {
     Get_Loading(&M_dot[nn], &E_dot[nn], t_sn[nn]);
     if (nn == 0) printf("%e %e\n", M_dot[0], E_dot[0]);
     E_dot[nn] = E_dot[nn]*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
@@ -562,7 +562,6 @@ Real Grid3D::Add_Supernovae(void)
   max_dti = fmax(max_dti, max_vy / H.dy);
   max_dti = fmax(max_dti, max_vz / H.dy);
 
-  }
 
   return max_dti;
 
