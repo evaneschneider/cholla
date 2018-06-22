@@ -145,9 +145,12 @@ int main(int argc, char *argv[])
     }
     */
     if (sn_dti > 0) {
-      if (C_cfl/sn_dti < G.H.dt) printf("SN timestep is shorter. Need to correct energy input. %e %e\n", C_cfl/sn_dti, G.H.dt);
-      fflush(stdout);
-      G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
+      while (C_cfl/sn_dti < G.H.dt) {
+        printf("SN timestep is shorter. Need to correct energy input. %e %e\n", C_cfl/sn_dti, G.H.dt);
+        fflush(stdout);
+        G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
+        sn_dti = G.Add_Supernovae();
+      }
     }
 
     #ifdef MPI_CHOLLA

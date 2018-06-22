@@ -279,129 +279,37 @@ Real Grid3D::Add_Supernovae(void)
   int ns = 0;
   SFR = 20.0; // star formation rate, in M_sun / yr
   R_c = 0.03; // cluster radius, in kpc
-  N_cluster = 20;
-  Real t_sn[20];
+  Real t_s[20]; // what time did the cluster turn on
+  Real t_c[20]; // how long has the cluster been on
 
   Real max_dti = 0;
 
   // start feedback after 5 Myr, ramp up for 5 Myr, high for 30 Myr, ramp down for 5 Myr
-  t = H.t/1000;
-  if (t >= 5 && t < 10) {
-    ns = 0; N_cluster = 10; // clusters 0 - 9 
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 5;
+  t = H.t/1000-5;
+
+  if (t >= 0) {
+  // turn on 2 clusters a year for 30 Myr, each cluster stays on for 10 Myr
+  if (t >= 0 && t < 10) {
+    ns = 0;
+    N_cluster = 2*(int(t)+1);
+    for (int nn=0; nn<N_cluster; nn++) {
+      t_s[nn] = nn/2;
+      t_c[nn] = t - t_s[nn];
     }
   }
-  if (t >= 10 && t < 15) {
-    ns = 0; N_cluster = 20; // clusters 0 - 19 
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 5;
-    }
-    for (nn = 10; nn < 20; nn++) {
-      t_sn[nn] = t - 10;
-    }    
-  }
-  if (t >= 15 && t < 20) {
-    ns = 10; N_cluster = 20; // clusters 10 - 29 
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 10;
-    }
-    for (nn = 10; nn < 20; nn++) {
-      t_sn[nn] = t - 15;
-    }      
-  }
-  if (t >= 20 && t < 25) {
-    ns = 20; N_cluster = 20; // clusters 20 - 39 
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 15;
-    }
-    for (nn = 10; nn < 20; nn++) {
-      t_sn[nn] = t - 20;
-    }    
-  }
-  if (t >= 25 && t < 30) {
-    ns = 30; N_cluster = 20; // clusters 30 - 49
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 20;
-    }
-    for (nn = 10; nn < 20; nn++) {
-      t_sn[nn] = t - 25;
-    }    
-  }
-  if (t >= 30 && t < 35) {
-    ns = 40; N_cluster = 20; // clusters 40 - 59 
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 25;
-    }
-    for (nn = 10; nn < 20; nn++) {
-      t_sn[nn] = t - 30;
-    }    
-  }
-  if (t >= 35 && t < 40) {
-    ns = 50; N_cluster = 13; // clusters 50 - 62 
-    for (nn = 0; nn < 10; nn++) {
-      t_sn[nn] = t - 30;
-    }
-    for (nn = 10; nn < 13; nn++) {
-      t_sn[nn] = t - 35;
-    }    
-  }
-  if (t >= 40 && t < 45) {
-    ns = 60; N_cluster = 5; // clusters 60 - 64
-    for (nn = 0; nn < 3; nn++) {
-      t_sn[nn] = t - 35;
-    }
-    for (nn = 3; nn < 5; nn++) {
-      t_sn[nn] = t - 40;
-    }     
-  }
-  if (t >= 45 && t < 50) {
-    ns = 63; N_cluster = 5; // clusters 63 - 67
-    for (nn = 0; nn < 2; nn++) {
-      t_sn[nn] = t - 40;
-    }
-    for (nn = 2; nn < 5; nn++) {
-      t_sn[nn] = t - 45;
-    }      
-  }
-  if (t >= 50 && t < 55) {
-    ns = 65; N_cluster = 5; // clusters 65 - 69
-    for (nn = 0; nn < 3; nn++) {
-      t_sn[nn] = t - 45;
-    }
-    for (nn = 3; nn < 5; nn++) {
-      t_sn[nn] = t - 50;
-    }    
-  }
-  if (t >= 55 && t < 60) {
-    ns = 68; N_cluster = 5; // clusters 68 - 72 
-    for (nn = 0; nn < 2; nn++) {
-      t_sn[nn] = t - 50;
-    }
-    for (nn = 2; nn < 5; nn++) {
-      t_sn[nn] = t - 55;
-    }    
-  }
-  if (t >= 60 && t < 65) {
-    ns = 70; N_cluster = 5; // clusters 70 - 74
-    for (nn = 0; nn < 3; nn++) {
-      t_sn[nn] = t - 55;
-    }
-    for (nn = 3; nn < 5; nn++) {
-      t_sn[nn] = t - 60;
-    }    
-  }
-  if (t >= 65 && t < 70) {
-    ns = 73; N_cluster = 2; // clusters 73 -74 
-    for (nn = 0; nn < 2; nn++) {
-      t_sn[nn] = t - 60;
+  else if (t >= 10 && t < 30) {
+    ns = 2*(int(t)+1 - 10);
+    N_cluster = 20;
+    for (int nn=0; nn<N_cluster; nn++) {
+      t_s[nn] = (nn + ns)/2;
+      t_c[nn] = t - t_s[nn];
     }
   }
-  if (t >= 70) {
-    ns = 75; N_cluster = 0; // no clusters 
+  else {
+    ns = 0;
+    N_cluster = 0;
   }
 
-  if (t >= 5) {
 
   // calculate the volume of a cluster
   V = (4.0/3.0)*PI*R_c*R_c*R_c;
@@ -410,7 +318,7 @@ Real Grid3D::Add_Supernovae(void)
 
   // Call function to get M_dot and E_dot for each cluster here
   for (nn = 0; nn<N_cluster; nn++) {
-    Get_Loading(&M_dot[nn], &E_dot[nn], t_sn[nn]);
+    Get_Loading(&M_dot[nn], &E_dot[nn], t_c[nn]);
     //chprintf("%d %e %e %e\n", ns, M_dot[nn], E_dot[nn], t_sn[nn]);
     E_dot[nn] = E_dot[nn]*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
     rho_dot[nn] = f * M_dot[nn] / (H.dx*H.dy*H.dz);
@@ -429,16 +337,19 @@ Real Grid3D::Add_Supernovae(void)
   M_dot_tot = E_dot_tot = 0.0;
 
 
-  for (int nn=ns; nn<ns+N_cluster; nn++) {
+  for (int nn=0; nn<N_cluster; nn++) {
+
+    // id of the cluster
+    int cid = nn + ns;
 
     // look up the cluster location from the list
-    x_sn = clusters[nn][0];
-    y_sn = clusters[nn][1];
-    z_sn = clusters[nn][2];
-    r_sn = clusters[nn][3];
-    phi_sn = clusters[nn][4];
-    // apply rotation (clusters move with keplarian velocity)
-    Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t_sn[nn]);
+    x_sn = clusters[cid][0];
+    y_sn = clusters[cid][1];
+    z_sn = clusters[cid][2];
+    r_sn = clusters[cid][3];
+    phi_sn = clusters[cid][4];
+    // apply rotation 
+    Rotate_Cluster(&x_sn, &y_sn, z_sn, r_sn, &phi_sn, t_c[nn]);
 
     int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
     // identify the global id of the cell containing the cluster center
@@ -493,7 +404,7 @@ Real Grid3D::Add_Supernovae(void)
         // entire cell is within cluster
         if (rr < R_c) {
         //if (r < R_c) {
-          if (t_sn[nn] == 0) {
+          if (t_c[nn] == 0) {
           C.density[id] += M_init;
           //C.momentum_x[id] = 0.0;
           //C.momentum_y[id] = 0.0;
@@ -543,7 +454,7 @@ Real Grid3D::Add_Supernovae(void)
             if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_c*R_c) incount++;
           }
           weight = incount / 1000.0;
-          if (t_sn[nn] == 0) {
+          if (t_c[nn] == 0) {
           C.density[id] += M_init * weight;
           //C.momentum_x[id] = 0.0;
           //C.momentum_y[id] = 0.0;
