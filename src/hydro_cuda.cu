@@ -295,9 +295,16 @@ __global__ void Update_Conserved_Variables_3D(Real *dev_conserved, Real *dev_F_x
                                   +  0.25*dt*gy*(d + d_n)*(vy + vy_n)
                                   +  0.25*dt*gz*(d + d_n)*(vz + vz_n);
     #endif    
+/*
+    if (dev_conserved[5*n_cells+id]/dev_conserved[id] > 1.0) {
+      printf("%3d %3d %3d %e %e %e\n", xid+x_off, yid+y_off, zid+z_off, dev_conserved[5*n_cells+id]/dev_conserved[5*n_cells+id], dev_conserved[id], dev_conserved[4*n_cells+id]);
+    }
+*/
+    /*
     if (dev_conserved[id] < 0.0 || dev_conserved[id] != dev_conserved[id] || dev_conserved[4*n_cells + id] < 0.0 || dev_conserved[4*n_cells+id] != dev_conserved[4*n_cells+id]) {
       printf("%3d %3d %3d Thread crashed in final update. %e %e %e %e %e\n", xid+x_off, yid+y_off, zid+z_off, dev_conserved[id], dtodx*(dev_F_x[imo]-dev_F_x[id]), dtody*(dev_F_y[jmo]-dev_F_y[id]), dtodz*(dev_F_z[kmo]-dev_F_z[id]), dev_conserved[4*n_cells+id]);
     }
+    */
     /*
     d  =  dev_conserved[            id];
     d_inv = 1.0 / d;

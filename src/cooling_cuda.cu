@@ -105,7 +105,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
 
     // calculate cooling rate per volume
     T = T_init;
-    if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
+    //if (T > T_max) printf("%3d %3d %3d High T cell. n: %e  T: %e\n", xid, yid, zid, n, T);
     // call the cooling function
     cool = CIE_cool(n, T); 
     //cool = Cloudy_cool(n, T); 
@@ -145,9 +145,11 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     #endif
     // calculate cooling rate for new T
     cool = CIE_cool(n, T);
+    del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
     //cool = Cloudy_cool(n, T);
     // only use good cells in timestep calculation (in case some have crashed)
-    if (n > 0 && T > 0 && cool > 0.0) {
+    // don't use cells that are just going to cool down to the temperature floor
+    if (n > 0 && T-del_T > T_min && cool > 0.0) {
       // limit the timestep such that delta_T is 10% 
       min_dt[tid] = 0.1*T*n*KB/(cool*TIME_UNIT*(gamma-1.0));
     }

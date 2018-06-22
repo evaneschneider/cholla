@@ -281,8 +281,8 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
     }  
     if (min_dt < C_cfl/max_dti) {
       max_dti = C_cfl/min_dt;
+      max_dti = fmin(C_cfl, C_cfl/min_dt);
     }
-    max_dti = fmin(C_cfl, max_dti);
     #endif
 
     // add one to the counter

@@ -497,6 +497,7 @@ void Grid3D::Fix_Cells(void)
   int i, j, k, id;
   Real d, mx, my, mz, P, E;
   Real n, T, mu;
+  Real c;
   mu = 0.6;
 
   for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
@@ -517,14 +518,17 @@ void Grid3D::Fix_Cells(void)
         #else
         T = P*PRESSURE_UNIT/(n*KB);
         #endif
+        c = C.scalar[id]/d;
 
         // if there is a problem, replace the cell value with surrounding cell average
         if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e9) {
+        //if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E || T > 1.0e10) {
 
-          printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
+          printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
 
           int idn;
           int N = 0;
+          int S = 0;
           Real d_av, vx_av, vy_av, vz_av, P_av;
           d_av = vx_av = vy_av = vz_av = P_av = 0.0;
           #ifdef SCALAR
@@ -546,7 +550,7 @@ void Grid3D::Fix_Cells(void)
             P  = (C.Energy[idn] - (0.5/d)*(mx*mx + my*my + mz*mz))*(gama-1.0);
             #ifdef SCALAR
             for (int n = 0; n<NSCALARS; n++) {
-              scalar[n]  = C.scalar[idn+n*H.n_cells] / d;
+              scalar[n]  = C.scalar[idn+n*H.n_cells];
             }
             #endif
             if (d > 0.0 && P > 0.0) {
@@ -571,12 +575,12 @@ void Grid3D::Fix_Cells(void)
           vx_av = vx_av/d_av;
           vy_av = vy_av/d_av;
           vz_av = vz_av/d_av;
-          d_av = d_av/N;
           #ifdef SCALAR
           for (int n=0; n<NSCALARS; n++) {
-            scalar_av[n] = scalar_av[n]/N;
+            scalar_av[n] = scalar_av[n]/d_av;
           }
           #endif
+          d_av = d_av/N;
 
           // replace cell values with new averaged values
           C.density[id] = d_av;
@@ -598,8 +602,9 @@ void Grid3D::Fix_Cells(void)
           P = P_av;
           n = d*DENSITY_UNIT/(mu*MP);
           T = P_av*PRESSURE_UNIT/(n*KB);
+          c = scalar_av[0];
 
-          printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
+          printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
 
         }
       }

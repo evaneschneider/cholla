@@ -23,9 +23,9 @@ void Grid3D::Set_Cluster_Locations() {
 
   Real R_s, z_s;
   Real r_sn, phi_sn, x_sn, y_sn, z_sn;
-  R_s = 0.75; // starburst radius, in kpc
+  R_s = 1.0; // starburst radius, in kpc
   //z_s = 0.105; // starburst height, in kpc
-  z_s = 0.01; // starburst height, in kpc
+  z_s = 0.005; // starburst height, in kpc
 
 
   // initialize the random seed
@@ -52,7 +52,11 @@ void Grid3D::Set_Cluster_Locations() {
 
 void Get_Loading(Real *M_dot, Real *E_dot, Real t) {
 
-  if (t < 0.1) {
+  if (t == 0) {
+    *M_dot = 0.0;
+    *E_dot = 0.0;
+  }
+  else if (t > 0 && t < 0.1) {
    *M_dot = 1.2e3*exp(-powf(powf((t-0.05),2)/(2*powf(0.028,2)),2));
    *E_dot = 4e41*t*t / (t*t + 0.05*t);
   }
@@ -274,7 +278,7 @@ Real Grid3D::Add_Supernovae(void)
   int nn = 0;
   int ns = 0;
   SFR = 20.0; // star formation rate, in M_sun / yr
-  R_c = 0.06; // cluster radius, in kpc
+  R_c = 0.03; // cluster radius, in kpc
   N_cluster = 20;
   Real t_sn[20];
 
@@ -397,6 +401,7 @@ Real Grid3D::Add_Supernovae(void)
     ns = 75; N_cluster = 0; // no clusters 
   }
 
+  if (t >= 5) {
 
   // calculate the volume of a cluster
   V = (4.0/3.0)*PI*R_c*R_c*R_c;
@@ -406,12 +411,16 @@ Real Grid3D::Add_Supernovae(void)
   // Call function to get M_dot and E_dot for each cluster here
   for (nn = 0; nn<N_cluster; nn++) {
     Get_Loading(&M_dot[nn], &E_dot[nn], t_sn[nn]);
-    if (nn == 0) printf("%e %e\n", M_dot[0], E_dot[0]);
+    //chprintf("%d %e %e %e\n", ns, M_dot[nn], E_dot[nn], t_sn[nn]);
     E_dot[nn] = E_dot[nn]*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
     rho_dot[nn] = f * M_dot[nn] / (H.dx*H.dy*H.dz);
     Ed_dot[nn] = f * E_dot[nn] / (H.dx*H.dy*H.dz);
   }
   
+  // Initialize the bubble with the total hot gas mass and
+  // energy content from the superbubble calculations
+  Real M_init = 5e3 / V;
+  Real E_init = 6e52/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT) / V;
 
   Real d_inv, vx, vy, vz, P, cs;
   Real max_vx, max_vy, max_vz;
@@ -420,7 +429,7 @@ Real Grid3D::Add_Supernovae(void)
   M_dot_tot = E_dot_tot = 0.0;
 
 
-  for (int nn=ns; nn< ns+N_cluster; nn++) {
+  for (int nn=ns; nn<ns+N_cluster; nn++) {
 
     // look up the cluster location from the list
     x_sn = clusters[nn][0];
@@ -481,22 +490,42 @@ Real Grid3D::Add_Supernovae(void)
         r = sqrt((x_pos-x_sn)*(x_pos-x_sn) + (y_pos-y_sn)*(y_pos-y_sn) + (z_pos-z_sn)*(z_pos-z_sn));
 
         // within cluster radius, inject mass and thermal energy
-        // entire cell is within sphere
+        // entire cell is within cluster
         if (rr < R_c) {
         //if (r < R_c) {
+          if (t_sn[nn] == 0) {
+          C.density[id] += M_init;
+          //C.momentum_x[id] = 0.0;
+          //C.momentum_y[id] = 0.0;
+          //C.momentum_z[id] = 0.0;
+          C.Energy[id]  += E_init;
+          #ifdef DE
+          C.GasEnergy[id] += E_init;
+          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+          //printf("%2d %f %f %f Starburst zone (total) n: %e T:%e.\n", nn, x_pos, y_pos, z_pos, n, T);
+          #endif
+          M_dot_tot += M_init*H.dx*H.dy*H.dz;
+          E_dot_tot += E_init*H.dx*H.dy*H.dz;
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*M_init;
+          #endif
+          }
+          else {
           C.density[id] += rho_dot[nn] * H.dt;
           C.Energy[id] += Ed_dot[nn] * H.dt;
           #ifdef DE
           C.GasEnergy[id] += Ed_dot[nn] * H.dt;
           //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
           //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+          //printf("%f %f %f Starburst zone (total) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
           #endif
-          //M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
-          //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
+          M_dot_tot += rho_dot[nn]*H.dx*H.dy*H.dz;
+          E_dot_tot += Ed_dot[nn]*H.dx*H.dy*H.dz;
           #ifdef SCALAR
           C.scalar[id] += 1.0*rho_dot[nn]*H.dt;
           #endif
+          }
         }
         // on the sphere
         if (rl < R_c && rr > R_c) {
@@ -514,19 +543,39 @@ Real Grid3D::Add_Supernovae(void)
             if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_c*R_c) incount++;
           }
           weight = incount / 1000.0;
+          if (t_sn[nn] == 0) {
+          C.density[id] += M_init * weight;
+          //C.momentum_x[id] = 0.0;
+          //C.momentum_y[id] = 0.0;
+          //C.momentum_z[id] = 0.0;
+          C.Energy[id]  += E_init * weight;
+          #ifdef DE
+          C.GasEnergy[id] += E_init * weight;
+          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+          //printf("%2d %f %f %f Starburst zone (partial) n: %e T:%e.\n", nn, x_pos, y_pos, z_pos, n, T);
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*weight*M_init;
+          #endif
+          M_dot_tot += M_init*weight*H.dx*H.dy*H.dz;
+          E_dot_tot += E_init*weight*H.dx*H.dy*H.dz;
+          }
+          else {
           C.density[id] += rho_dot[nn] * H.dt * weight;
           C.Energy[id]  += Ed_dot[nn] * H.dt * weight;
           #ifdef DE
           C.GasEnergy[id] += Ed_dot[nn] * H.dt * weight;
           //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
           //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          //printf("%f %f %f Starburst zone n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+          //printf("%f %f %f Starburst zone (partial) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
           #endif
           #ifdef SCALAR
           C.scalar[id] += 1.0*weight*rho_dot[nn]*H.dt;
           #endif
-          //M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
-          //E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
+          M_dot_tot += rho_dot[nn]*weight*H.dx*H.dy*H.dz;
+          E_dot_tot += Ed_dot[nn]*weight*H.dx*H.dy*H.dz;
+          }
         }
         // recalculate the timestep for these cells
         d_inv = 1.0 / C.density[id];
@@ -548,20 +597,20 @@ Real Grid3D::Add_Supernovae(void)
 
   }
 
-  /*
-  printf("procID: %d M_dot: %e E_dot: %e\n", procID, M_dot_tot, E_dot_tot);
+  //printf("procID: %d M_dot: %e E_dot: %e\n", procID, M_dot_tot, E_dot_tot);
   MPI_Barrier(MPI_COMM_WORLD);
   Real global_M_dot, global_E_dot;
   MPI_Reduce(&M_dot_tot, &global_M_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(&E_dot_tot, &global_E_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
-  chprintf("Total M_dot: %e E_dot: %e \n", global_M_dot, global_E_dot); 
-  */
+  chprintf("Total M_dot: %e E_dot: %e \n", global_M_dot, global_E_dot*MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); 
+  fflush(stdout);
 
   // compute max inverse of dt
   max_dti = max_vx / H.dx;
   max_dti = fmax(max_dti, max_vy / H.dy);
   max_dti = fmax(max_dti, max_vz / H.dy);
 
+  }
 
   return max_dti;
 
