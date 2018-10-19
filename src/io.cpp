@@ -38,14 +38,21 @@ void WriteHistory(Grid3D G, struct parameters P)
 {
   Real bubble_radius, bubble_volume, bubble_mass, bubble_energy, bubble_energy_th;
 
+  M_out = 0.0;
+  Mhot_out = 0.0;
+  E_out = 0.0;
+
   G.Analysis_Functions(&bubble_volume, &bubble_mass, &bubble_energy, &bubble_energy_th);
 
   #ifdef MPI_CHOLLA
   MPI_Barrier(world);
-  ReduceRealSum(bubble_mass);
-  ReduceRealSum(bubble_energy);
-  ReduceRealSum(bubble_energy_th);
-  ReduceRealSum(bubble_volume);
+  bubble_mass = ReduceRealSum(bubble_mass);
+  bubble_energy = ReduceRealSum(bubble_energy);
+  bubble_energy_th = ReduceRealSum(bubble_energy_th);
+  bubble_volume = ReduceRealSum(bubble_volume);
+  M_out = ReduceRealSum(M_out);
+  Mhot_out = ReduceRealSum(Mhot_out);
+  E_out = ReduceRealSum(E_out);
   if (procID == 0) {
   #endif 
   bubble_radius = pow(0.75*bubble_volume/PI, (1./3.));
@@ -62,8 +69,15 @@ void WriteHistory(Grid3D G, struct parameters P)
   out = fopen(filename, "a");
   if(out == NULL) {printf("Error opening output file.\n"); exit(-1); }
 
+  E_out = E_out*MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT / TIME_UNIT;
+
   // write the results from the analysis functions
-  fprintf(out, "%8.3f %8.5e %8.5e %8.5e %8.5e\n", G.H.t, bubble_radius, bubble_mass, bubble_energy, bubble_energy_th);
+  fprintf(out, "%8.3f %8.5e %8.5e %8.5e %8.5e %8.5e %8.5e %8.5e\n", G.H.t, bubble_radius, bubble_mass, bubble_energy, bubble_energy_th, M_out, Mhot_out, E_out);
+
+  // reset global outflow variables
+  M_out = 0.0;
+  Mhot_out = 0.0;
+  E_out = 0.0;
 
   // close the output file
   fclose(out);

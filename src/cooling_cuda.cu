@@ -130,7 +130,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
       // calculate new change in temperature
       del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
       loop++;
-      if (loop > 100) {
+      if (loop > 1000) {
         printf("del_T: %e  T: %e  cool: %e\n", del_T, T, cool);
         break;
       }
@@ -155,10 +155,11 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     //cool = CIE_cool(n, T);
     //cool = Cloudy_cool(n, T);
     cool = TI_cool(n, T);
+    del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
     // only use good cells in timestep calculation (in case some have crashed)
-    if (n > 0 && T > 0 && cool > 0.0) {
-      // limit the timestep such that delta_T is 10% 
-      min_dt[tid] = 0.1*T*n*KB/(cool*TIME_UNIT*(gamma-1.0));
+    if (n > 0 && T > 0 && cool > 0.0 && (T - del_T) > 1e1) {
+      // limit the timestep such that delta_T is 50% 
+      min_dt[tid] = 0.5*T*n*KB/(cool*TIME_UNIT*(gamma-1.0));
     }
 
     // and send back from kernel
@@ -385,7 +386,7 @@ __device__ Real TI_cool(Real n, Real T)
   Real lambda = 0.0; //cooling rate, erg s^-1 cm^3
   Real  H = 0.0; //heating rate, erg s^-1
   Real cool = 0.0; //cooling per unit volume, erg /s / cm^3
-  Real n_av = 100.0; //mean density in the sim volume
+  Real n_av = 10.0; //mean density in the sim volume
 
   // Below 10K only include photoelectric heating
   if (log10(T) < 1.0) {

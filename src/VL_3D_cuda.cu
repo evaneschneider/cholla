@@ -176,7 +176,7 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
     Update_Conserved_Variables_3D_half<<<dim1dGrid,dim1dBlock>>>(dev_conserved, dev_conserved_half, F_x, F_y, F_z, nx_s, ny_s, nz_s, n_ghost, dx, dy, dz, 0.5*dt, gama, n_fields);
     CudaCheckError();
     #ifdef COOLING_GPU
-    cooling_kernel<<<dim1dGrid,dim1dBlock>>>(dev_conserved_half, nx_s, ny_s, nz_s, n_ghost, n_fields, 0.5*dt, gama, dev_dt_array);  
+    cooling_kernel<<<dim1dGrid,dim1dBlock>>>(dev_conserved_half, nx_s, ny_s, nz_s, n_ghost, n_fields, dt, gama, dev_dt_array);  
     CudaCheckError();
     #endif
 
@@ -281,7 +281,7 @@ Real VL_Algorithm_3D_CUDA(Real *host_conserved0, Real *host_conserved1, int nx, 
       min_dt = fmin(min_dt, host_dt_array[i]);
     }  
     if (min_dt < C_cfl/max_dti) {
-      //printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
+      printf("dt cooling: %f  dt hydro: %f\n", min_dt, C_cfl/max_dti);
       max_dti = C_cfl/min_dt;
     }
     #endif
@@ -410,9 +410,9 @@ __global__ void Update_Conserved_Variables_3D_half(Real *dev_conserved, Real *de
                                        + dtodz * (dev_F_z[(n_fields-1)*n_cells + kmo] - dev_F_z[(n_fields-1)*n_cells + id])
                                        + 0.5*P*(dtodx*(vx_imo-vx_ipo) + dtody*(vy_jmo-vy_jpo) + dtodz*(vz_kmo-vz_kpo));
     #endif
-    //if (dev_conserved_half[id] < 0.0 || dev_conserved_half[id] != dev_conserved_half[id] || dev_conserved_half[4*n_cells+id] < 0.0 || dev_conserved_half[4*n_cells+id] != dev_conserved_half[4*n_cells+id]) {
-      //printf("%3d %3d %3d Thread crashed in half step update. d: %e E: %e\n", xid, yid, zid, dev_conserved_half[id], dev_conserved_half[4*n_cells+id]);
-    //}    
+    if (dev_conserved_half[id] < 0.0 || dev_conserved_half[id] != dev_conserved_half[id] || dev_conserved_half[4*n_cells+id] < 0.0 || dev_conserved_half[4*n_cells+id] != dev_conserved_half[4*n_cells+id]) {
+      printf("%3d %3d %3d Thread crashed in half step update. d: %e E: %e\n", xid, yid, zid, dev_conserved_half[id], dev_conserved_half[4*n_cells+id]);
+    }    
 
   }
 

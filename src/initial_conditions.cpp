@@ -311,11 +311,11 @@ void Grid3D::Square_Wave(Real rho, Real vx, Real vy, Real vz, Real P, Real A)
  *  \brief Sets up a box with density perturbations. */
 void Grid3D::Superbubble(Real rho, Real P, Real A)
 {
-  int i, j, k, id;
+  int i, j, k, id, index;
   int istart, jstart, kstart, iend, jend, kend;
   Real x_pos, y_pos, z_pos;
   Real k_i, k_j, k_k;
-  Real theta;
+  //Real theta;
   Real n, T, mu;
   mu = 1.27;
   rho = rho*mu*MP / DENSITY_UNIT;
@@ -344,14 +344,27 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
   }
 
   double rho_av = 0;
+  int imax = 5;
+  //double kmax = 2.0*PI*imax / H.ydglobal;
+  double kmax = 2.0*PI*imax;
+  double sum = 0.0;
+  double theta[imax*imax*imax];
+  // seed the random number generator
+  srand(120);
+  for (int ii=0; ii<imax; ii++) {
+    for (int jj=0; jj<imax; jj++) {
+      for (int kk=0; kk<imax; kk++) {
+        index = ii+imax*jj+imax*imax*kk;
+         printf("%d\n", index);
+        theta[index] = (rand() % 1000) / 1000. * 2*PI;
+      }
+    }
+  }
 
   // set initial values of conserved variables
   for(k=kstart; k<kend; k++) {
     for(j=jstart; j<jend; j++) {
       for(i=istart; i<iend; i++) {
-
-        // seed the random number generator
-        srand(120);
 
         //get cell index
         id = i + j*H.nx + k*H.nx*H.ny;
@@ -367,17 +380,22 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
         C.Energy[id]     = P/(gama-1.0);
         C.GasEnergy[id]  = P/(gama-1.0);
         // add density perturbations
-        for (int ii=0; ii<6; ii++) {
-          for (int jj=0; jj<6; jj++) {
-            for (int kk=0; kk<6; kk++) {
-              k_i = 2.0*PI*ii / H.domlen_x;
-              k_j = 2.0*PI*jj / H.domlen_y;
-              k_k = 2.0*PI*kk / H.domlen_z;
-              theta = (rand() % 1000) / 1000. * 2*PI;
-              C.density[id]    += (1.0/125.0) * rho * A * sin(k_i*x_pos + k_j*y_pos + k_k*z_pos + theta);
+        sum = 0.0;
+        for (int ii=0; ii<imax; ii++) {
+          for (int jj=0; jj<imax; jj++) {
+            for (int kk=0; kk<imax; kk++) {
+              index = ii+imax*jj+imax*imax*kk;
+              //k_i = 4.0*PI*ii / H.xdglobal;
+              //k_j = 4.0*PI*jj / H.ydglobal;
+              k_i = 2.0*PI*ii / H.xdglobal;
+              k_j = 2.0*PI*jj / H.ydglobal;
+              k_k = 2.0*PI*kk / H.zdglobal;
+              sum += sin(k_i*x_pos + k_j*y_pos + k_k*z_pos + theta[index]);
             }
           }
         }
+        //if (sum < 0.0) printf("%d %d %d %f %f\n", i, j, k, A/kmax, sum);
+        C.density[id] += rho*(A/kmax)*sum;
         #ifdef SCALAR
         C.scalar[id] = 0.0*C.density[id];
         #endif
@@ -385,7 +403,7 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
       }
     }
   }
-  printf("%f\n", rho_av / (512*256*256));
+  printf("%f\n", rho_av / (H.nx_real*H.ny_real*H.nz_real));
 
 }
 

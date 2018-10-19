@@ -15,6 +15,9 @@
 #include "error_handling.h"
 #include "ran.h"
 
+Real M_out;
+Real Mhot_out;
+Real E_out;
 
 //Add a single supernova with 10^51 ergs of thermal energy and 10 M_sun
 Real Grid3D::Add_Supernova(void)
@@ -585,6 +588,35 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
           *bubble_mass += d*H.dx*H.dy*H.dz;
         }
 
+        // if cell is on a boundary, calculate mass and energy outflow rates
+        if (i+nx_local_start == nx_global - H.n_ghost-1) {
+          M_out += d*fmax(vx, 0)*H.dy*H.dz;
+          E_out += E*fmax(vx, 0)*H.dy*H.dz;
+        }
+        if (i-nx_local_start == H.n_ghost) {
+          M_out += d*fabs(fmin(vx, 0))*H.dy*H.dz;
+          E_out += E*fabs(fmin(vx, 0))*H.dy*H.dz;
+        }
+        if (j+ny_local_start == ny_global - H.n_ghost-1) {
+          M_out += d*fmax(vy, 0)*H.dx*H.dz;
+          E_out += E*fmax(vy, 0)*H.dx*H.dz;
+        }
+        if (j-ny_local_start == H.n_ghost) {
+          M_out += d*fabs(fmin(vy, 0))*H.dx*H.dz;
+          E_out += E*fabs(fmin(vy, 0))*H.dx*H.dz;
+        }
+        if (k+nz_local_start == nz_global - H.n_ghost-1) {
+          M_out += d*fmax(vz, 0)*H.dx*H.dy;
+          if (T > 1e5) 
+            Mhot_out += d*fmax(vz, 0)*H.dx*H.dy;
+          E_out += E*fmax(vz, 0)*H.dx*H.dy;
+        }
+        if (k-nz_local_start == H.n_ghost) {
+          M_out += d*fabs(fmin(vz, 0))*H.dx*H.dy;
+          if (T > 1e5) 
+            Mhot_out += d*fabs(fmin(vz, 0))*H.dx*H.dy;
+          E_out += E*fabs(fmin(vz, 0))*H.dx*H.dy;
+        }
       }
     }
   }

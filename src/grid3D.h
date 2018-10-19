@@ -15,6 +15,10 @@
 #include<hdf5.h>
 #endif
 
+extern Real M_out;
+extern Real Mhot_out;
+extern Real E_out;
+
 struct Rotation
 {
   /*! \var nx

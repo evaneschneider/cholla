@@ -17,6 +17,7 @@
 #define OUTPUT
 #define HIST
 //#define CPU_TIME
+#define SUPERNOVA
 
 int main(int argc, char *argv[])
 {
@@ -49,7 +50,7 @@ int main(int argc, char *argv[])
 
   // SN timing variables
   Real sn_dti = 0.0;
-  Real dt_SN = 0.1; // time between SN (code units)
+  Real dt_SN = 10.0; // time between SN (code units)
   Real t_SN_next = 0.0;
 
   // read in command line arguments
@@ -83,7 +84,7 @@ int main(int argc, char *argv[])
   chprintf("Initial conditions set.\n");
   // set main variables for Read_Grid inital conditions
   if (strcmp(P.init, "Read_Grid") == 0) {
-    dti = C_cfl / G.H.dt;
+    dti = C_cfl / (0.00001*G.H.dt);
     outtime += G.H.t;
     histtime += G.H.t;
     nfile = P.nfile*P.nfull;
@@ -150,6 +151,8 @@ int main(int argc, char *argv[])
     // Add supernovae
     //sn_dti = G.Add_Supernovae_CC85();
     //sn_dti = G.Add_Supernovae();
+     
+    #ifdef SUPERNOVA
     if (G.H.t >= t_SN_next) {
       sn_dti = G.Add_Supernova();
       t_SN_next += dt_SN;
@@ -157,11 +160,11 @@ int main(int argc, char *argv[])
     if (sn_dti > 0) {
       G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
     }
-
     #ifdef MPI_CHOLLA
     G.H.dt = ReduceRealMin(G.H.dt);
     #endif
-   
+    #endif
+     
 
     // Advance the grid by one timestep
     #ifdef CPU_TIME
