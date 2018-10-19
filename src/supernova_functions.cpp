@@ -550,12 +550,26 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
   Real e_s = MASS_UNIT*LENGTH_UNIT*LENGTH_UNIT / (TIME_UNIT*TIME_UNIT);
   int n_bub = 0;
   mu = 1.27;
+  int xl, xr, yl, yr, zl, zr, rl, rr, r, vr;
+  Real R_s = 0.010; // measure mass and energy outflow at the cluster radius
 
   for (int k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
     for (int j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
       for (int i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
 
         int id = i + j*H.nx + k*H.nx*H.ny;
+
+        // calculate spherical radius
+        xl = fabs(x_pos)-0.5*H.dx;
+        yl = fabs(y_pos)-0.5*H.dy;
+        zl = fabs(z_pos)-0.5*H.dz;
+        xr = fabs(x_pos)+0.5*H.dx;
+        yr = fabs(y_pos)+0.5*H.dy;
+        zr = fabs(z_pos)+0.5*H.dz;
+        rl = sqrt(xl*xl + yl*yl + zl*zl);
+        rr = sqrt(xr*xr + yr*yr + zr*zr);
+        r = sqrt(x_pos*x_pos + y_pos*y_pos + z_pos*z_pos);
+
 
         d = C.density[id];
         E = C.Energy[id];
@@ -568,6 +582,7 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
         vy = my/d;
         vz = mz/d;
         v = sqrt(vx*vx + vy*vy + vz*vz);
+        vr = (x_pos*vx + y_pos*vy + z_pos*vz) / r;
         n = d*DENSITY_UNIT/(mu*MP);
         #ifdef DE
         gE = C.GasEnergy[id];
@@ -588,6 +603,7 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
           *bubble_mass += d*H.dx*H.dy*H.dz;
         }
 
+/*
         // if cell is on a boundary, calculate mass and energy outflow rates
         if (i+nx_local_start == nx_global - H.n_ghost-1) {
           M_out += d*fmax(vx, 0)*H.dy*H.dz;
@@ -617,6 +633,15 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
             Mhot_out += d*fabs(fmin(vz, 0))*H.dx*H.dy;
           E_out += E*fabs(fmin(vz, 0))*H.dx*H.dy;
         }
+*/
+        // on the sphere
+        if (rl < R_s && rr > R_s) {
+          M_out += d*vr*H.dx*H.dy;
+          E_out += E*vr*H.dx*H.dy;
+          if (T > 1e5)
+            Mhot_out += d*vr*H.dx*H.dy;
+        }
+
       }
     }
   }
