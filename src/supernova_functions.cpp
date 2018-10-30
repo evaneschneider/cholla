@@ -536,6 +536,112 @@ Real Grid3D::Add_Supernovae_CC85(void)
 
 }
 
+void get_S99_fluxes(Real *M_dot, Real *E_dot, Real t) {
+
+
+}
+
+void Grid3D::Add_Supernovae_S99(void)
+{
+  int i, j, k, id;
+  Real x_pos, y_pos, z_pos, r, R_s;
+  Real M_dot, E_dot, V, rho_dot, Ed_dot;
+  Real d_inv, vx, vy, vz, P, cs;
+  Real xl, yl, zl, xr, yr, zr, rl, rr;
+  int incount, ii;
+  Real weight, xpoint, ypoint, zpoint;
+  Real max_vx, max_vy, max_vz, max_dti;
+  max_dti = max_vx = max_vy = max_vz = 0.0;
+  R_s = 4*H.dx; // supernova radius
+  M_dot = 0.0;
+  E_dot = 0.0;
+
+  get_S99_fluxes(&M_dot, &E_dot, H.t);
+
+  E_dot = E_dot*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
+  V = (4.0/3.0)*PI*R_s*R_s*R_s;
+  //V = PI*R_s*R_s*2*z_s;
+  rho_dot = M_dot / V;
+  Ed_dot = E_dot / V;
+  //printf("rho_dot: %f  Ed_dot: %f\n", rho_dot, Ed_dot);
+
+  Real M_dot_tot, E_dot_tot;
+
+  for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
+    for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
+      for (i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
+
+        id = i + j*H.nx + k*H.nx*H.ny;
+
+        Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
+        
+        // calculate spherical radius
+        xl = fabs(x_pos)-0.5*H.dx;
+        yl = fabs(y_pos)-0.5*H.dy;
+        zl = fabs(z_pos)-0.5*H.dz;
+        xr = fabs(x_pos)+0.5*H.dx;
+        yr = fabs(y_pos)+0.5*H.dy;
+        zr = fabs(z_pos)+0.5*H.dz;
+        rl = sqrt(xl*xl + yl*yl + zl*zl);
+        rr = sqrt(xr*xr + yr*yr + zr*zr);
+        r = sqrt(x_pos*x_pos + y_pos*y_pos + z_pos*z_pos);
+
+        // within starburst radius, inject mass and thermal energy
+        // entire cell is within sphere
+        if (rr < R_s) {
+          C.density[id] += rho_dot * H.dt;
+          C.Energy[id] += Ed_dot * H.dt;
+          #ifdef DE
+          C.GasEnergy[id] += Ed_dot * H.dt;
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot * H.dt;
+          #endif          
+          M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
+          E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
+        }
+        // on the sphere
+        if (rl < R_s && rr > R_s) {
+          // quick Monte Carlo to determine weighting
+          Ran quickran(50);
+          incount = 0;
+          for (ii=0; ii<1000; ii++) {
+            // generate a random number between x_pos and dx
+            xpoint = xl + H.dx*quickran.doub();
+            // generate a random number between y_pos and dy
+            ypoint = yl + H.dy*quickran.doub();
+            // generate a random number between z_pos and dz
+            zpoint = zl + H.dz*quickran.doub();
+            // check to see whether the point is within the sphere 
+            if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_s*R_s) incount++;
+            //if (xpoint*xpoint + ypoint*ypoint < R_s*R_s) incount++;
+          }
+          weight = incount / 1000.0;
+          C.density[id] += rho_dot * H.dt * weight;
+          C.Energy[id]  += Ed_dot * H.dt * weight;
+          #ifdef DE
+          C.GasEnergy[id] += Ed_dot * H.dt * weight;
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot * H.dt * weight;
+          #endif            
+          M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
+          E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
+        }
+
+      }
+    }
+  }
+
+  printf("%e %e\n", M_dot_tot, E_dot_tot*(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT)/TIME_UNIT);
+  //Real global_M_dot, global_E_dot;
+  //MPI_Reduce(&M_dot_tot, &global_M_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
+  //MPI_Reduce(&E_dot_tot, &global_E_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
+  //chprintf("%e %e \n", global_M_dot, global_E_dot*MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT/TIME_UNIT); 
+
+}
+
+
 
 void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th) {
 
@@ -648,5 +754,69 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
     }
   }
   *bubble_volume = n_bub*H.dx*H.dy*H.dz;
+
+}
+
+
+void Load_S99_Tables(void) {
+
+  double *t_arr;
+  double *M_arr;
+  double *E_arr;
+
+  int i;
+  int nx = 1000;
+
+  FILE *infile;
+  char buffer[0x1000];
+  char * pch;
+
+  // allocate arrays for each variable
+  t_arr = (double *) malloc(nx*sizeof(double));
+  M_arr = (double *) malloc(nx*sizeof(double));
+  E_arr = (double *) malloc(nx*sizeof(double));
+
+  // Read in cloudy cooling/heating curve (function of density and temperature)
+  i=0;
+  infile = fopen("./S99_table.txt", "r");
+  if (infile == NULL) {
+    printf("Unable to open Starburst99 file.\n");
+    exit(1);
+  }
+  while (fgets(buffer, sizeof(buffer), infile) != NULL)
+  {
+    if (buffer[0] == '#') {
+      continue;
+    }
+    else {
+      pch = strtok(buffer, "\t");
+      t_arr[i] = atof(pch);
+      while (pch != NULL)
+      {
+        pch = strtok(NULL, "\t");
+        if (pch != NULL)
+          M_arr[i] = atof(pch);
+        pch = strtok(NULL, "\t");
+        if (pch != NULL)
+          E_arr[i] = atof(pch);
+      }
+      i++;
+    }
+  }
+  fclose(infile);
+
+  // copy data from cooling array into the table
+  for (i=0; i<nx; i++)
+  {
+    S99_table[0][i] = float(t_arr[i]);
+    S99_table[1][i] = float(M_arr[i]);
+    S99_table[2][i] = float(E_arr[i]);
+  }
+
+  // Free arrays used to read in table data
+  free(t_arr);
+  free(M_arr);
+  free(E_arr);
+
 
 }

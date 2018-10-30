@@ -239,7 +239,9 @@ void Grid3D::AllocateMemory(void)
   #ifdef CLOUDY_COOL
   //printf("Warning: Cloudy cooling isn't currently working. No cooling will be applied.\n");
   Load_Cuda_Textures();
-  #endif  
+  #endif
+
+  Load_S99_Tables();
 
 }
 

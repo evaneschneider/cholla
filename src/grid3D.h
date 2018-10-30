@@ -18,6 +18,7 @@
 extern Real M_out;
 extern Real Mhot_out;
 extern Real E_out;
+extern float S99_table[3][1000];
 
 struct Rotation
 {
@@ -430,6 +431,7 @@ class Grid3D
     Real Add_Supernova(void);    
     Real Add_Supernovae(void);    
     Real Add_Supernovae_CC85(void);
+    void Add_Supernovae_S99(void);
     void Fix_Cells(void);
     void Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th);
 
