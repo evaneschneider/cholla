@@ -84,23 +84,28 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     vy =  dev_conserved[2*n_cells + id] / d;
     vz =  dev_conserved[3*n_cells + id] / d;
     p  = (E - 0.5*d*(vx*vx + vy*vy + vz*vz)) * (gamma - 1.0);
-    p  = fmax(p, (Real) TINY_NUMBER);
+    //p  = fmax(p, (Real) TINY_NUMBER);
     //#endif
     #ifdef DE
     ge = dev_conserved[(n_fields-1)*n_cells + id] / d;
-    ge = fmax(ge, (Real) TINY_NUMBER);
+    //ge = fmax(ge, (Real) TINY_NUMBER);
     #endif
     
     // calculate the number density of the gas (in cgs)
     n = d*DENSITY_UNIT / (mu * MP);
 
+    Real T_init_p, T_init_ge;
     // calculate the temperature of the gas
     //#ifndef DE
-    T_init = p*PRESSURE_UNIT/ (n*KB);
+    T_init_p = p*PRESSURE_UNIT/ (n*KB);
+    //if (T_init_p < 0.0) printf("%3d %3d %3d Negative initial temperature. T: %e\n", xid, yid, zid, T_init_p);
+    T_init = T_init_p;
     //#endif
     #ifdef DE
     //T_init = ge*(gamma-1.0)*SP_ENERGY_UNIT*mu*MP/KB;
-    T_init = d*ge*(gamma-1.0)*PRESSURE_UNIT/(n*KB);
+    T_init_ge = d*ge*(gamma-1.0)*PRESSURE_UNIT/(n*KB);
+    //if (T_init_ge < 0.0) printf("%3d %3d %3d Negative initial temperature. T: %e\n", xid, yid, zid, T_init_ge);
+    T_init = T_init_ge;
     #endif
 
     // calculate cooling rate per volume
@@ -110,6 +115,7 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     //cool = CIE_cool(n, T); 
     //cool = Cloudy_cool(n, T); 
     cool = TI_cool(n, T);
+    //if (T_init_ge < 0.0) printf("%3d %3d %3d Negative initial temperature. T: %e  T: %e  cool: %e\n", xid, yid, zid, T_init_p, T_init_ge, cool);
     
     // calculate change in temperature given dt
     del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);

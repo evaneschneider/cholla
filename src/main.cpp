@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 
   // SN timing variables
   Real sn_dti = 0.0;
-  Real dt_SN = 10.0; // time between SN (code units)
+  Real dt_SN = 10.; // time between SN (code units)
   Real t_SN_next = 0.0;
 
   // read in command line arguments

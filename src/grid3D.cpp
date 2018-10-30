@@ -28,7 +28,6 @@
 #include "mpi_routines.h"
 #endif
 #include <stdio.h>
-#include "flux_correction.h"
 #ifdef CLOUDY_COOL
 #include "cooling_wrapper.h"
 #endif
@@ -107,7 +106,7 @@ void Grid3D::Initialize(struct parameters *P)
   int nz_in = P->nz;
 
   // Set the CFL coefficient (a global variable)
-  C_cfl = 0.2;
+  C_cfl = 0.1;
 
 #ifndef MPI_CHOLLA
 
@@ -509,7 +508,7 @@ void Grid3D::Fix_Cells(void)
         #endif
 
         // if there is a problem, replace the cell value with surrounding cell average
-        if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e9) {
+        if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e10) {
 
           printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
 

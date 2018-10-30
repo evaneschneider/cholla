@@ -512,7 +512,7 @@ __global__ void Sync_Energies_3D(Real *dev_conserved, int nx, int ny, int nz, in
       if (ge1 > 0.0) dev_conserved[4*n_cells + id] += ge1 - ge2;
       else dev_conserved[(n_fields-1)*n_cells+id] = ge2;
     }
-    // calculate the pressure 
+    // recalculate the pressure 
     //Real P = (dev_conserved[4*n_cells + id] - 0.5*d*(vx*vx + vy*vy + vz*vz)) * (gamma - 1.0);
     //if (P < 0.0) printf("%3d %3d %3d Negative pressure after internal energy sync. %f %f %f\n", xid, yid, zid, P/(gamma-1.0), ge1, ge2);    
   }

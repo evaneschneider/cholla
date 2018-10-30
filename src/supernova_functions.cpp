@@ -550,8 +550,9 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
   Real e_s = MASS_UNIT*LENGTH_UNIT*LENGTH_UNIT / (TIME_UNIT*TIME_UNIT);
   int n_bub = 0;
   mu = 1.27;
-  int xl, xr, yl, yr, zl, zr, rl, rr, r, vr;
-  Real R_s = 0.010; // measure mass and energy outflow at the cluster radius
+  Real x_pos, y_pos, z_pos;
+  Real xl, xr, yl, yr, zl, zr, rl, rr, r, vr;
+  Real R_s = 29.99; // measure mass and energy outflow at the cluster radius
 
   for (int k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
     for (int j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
@@ -560,6 +561,7 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
         int id = i + j*H.nx + k*H.nx*H.ny;
 
         // calculate spherical radius
+        Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
         xl = fabs(x_pos)-0.5*H.dx;
         yl = fabs(y_pos)-0.5*H.dy;
         zl = fabs(z_pos)-0.5*H.dz;
