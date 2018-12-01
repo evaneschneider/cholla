@@ -864,7 +864,7 @@ void Grid3D::Disk_3D(parameters p)
   hydrostatic_ray_analytical_D3D(rho_halo, r_halo, hdp, dr, nr);
   chprintf("Hot halo lookup table generated...\n");
 
-
+/*
   //////////////////////////////////////////////
   //////////////////////////////////////////////
   // Add a disk component
@@ -1024,7 +1024,7 @@ void Grid3D::Disk_3D(parameters p)
       }
     }
   }
-
+*/
   //////////////////////////////////////////////
   //////////////////////////////////////////////
   // Add a hot, hydrostatic halo

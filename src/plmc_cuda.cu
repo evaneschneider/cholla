@@ -166,7 +166,7 @@ __global__ void PLMC_cuda(Real *dev_conserved, Real *dev_bounds_L, Real *dev_bou
 
     // Compute the eigenvalues of the linearized equations in the
     // primative variables using the cell-centered primative variables
-    #ifdef CTU
+    #ifndef VL
     lambda_m = vx_i-a_i;
     lambda_0 = vx_i;
     lambda_p = vx_i+a_i; 
@@ -412,7 +412,7 @@ __global__ void PLMC_cuda(Real *dev_conserved, Real *dev_bounds_L, Real *dev_bou
     #endif
 
 
-    #ifdef CTU
+    #ifndef VL 
     // Integrate linear interpolation function over domain of dependence
     // defined by max(min) eigenvalue
     qx = -0.5*fmin(lambda_m, 0)*dtodx;

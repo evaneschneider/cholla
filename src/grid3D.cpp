@@ -106,7 +106,7 @@ void Grid3D::Initialize(struct parameters *P)
   int nz_in = P->nz;
 
   // Set the CFL coefficient (a global variable)
-  C_cfl = 0.3;
+  C_cfl = 0.2;
 
   // Set the output timestep
   H.out_step = P->gridstep;
@@ -605,6 +605,9 @@ void Grid3D::Fix_Cells(void)
           c = scalar_av[0];
 
           printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
+          if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e9) {
+            printf("%3d %3d %3d Flux correction failed: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
+          }
 
         }
       }

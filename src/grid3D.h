@@ -424,7 +424,7 @@ class Grid3D
     void Disk_3D(parameters P);    
 
     Real Add_Supernova(void);    
-    Real Add_Supernovae(void);    
+    Real Add_Supernovae(Real dt_old);    
     Real Add_Supernovae_old(void);    
     Real Add_Supernovae_CC85(void);
     void Fix_Cells(void);

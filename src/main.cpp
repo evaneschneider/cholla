@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
   // set main variables for Read_Grid inital conditions
   if (strcmp(P.init, "Read_Grid") == 0) {
     dti = C_cfl / G.H.dt / 0.0001;
-    G.H.dt = G.H.dt*0.0001;
+    G.H.dt = G.H.dt*0.01;
     outtime += G.H.t;
     t_SN_next += G.H.t;
   }
@@ -136,8 +136,9 @@ int main(int argc, char *argv[])
     }
 
     // Add supernovae
-    // Real sn_dti = G.Add_Supernovae_CC85();
-    Real sn_dti = G.Add_Supernovae();
+    Real dt_old = G.H.dt;
+    Real sn_dti = G.Add_Supernovae_CC85();
+    //Real sn_dti = G.Add_Supernovae(dt_old);
     /*
     if (G.H.t >= t_SN_next) {
       Real sn_dti = G.Add_Supernova();
@@ -145,17 +146,18 @@ int main(int argc, char *argv[])
     }
     */
     if (sn_dti > 0) {
-      while (C_cfl/sn_dti < G.H.dt) {
+      if (C_cfl/sn_dti < G.H.dt) {
         printf("SN timestep is shorter. Need to correct energy input. %e %e\n", C_cfl/sn_dti, G.H.dt);
         fflush(stdout);
-        G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
-        sn_dti = G.Add_Supernovae();
+        //G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
       }
     }
-
     #ifdef MPI_CHOLLA
     G.H.dt = ReduceRealMin(G.H.dt);
     #endif
+    if (dt_old > G.H.dt) {
+      sn_dti = G.Add_Supernovae(dt_old);
+    }
    
 
     // Advance the grid by one timestep

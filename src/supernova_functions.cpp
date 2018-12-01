@@ -263,7 +263,7 @@ Real Grid3D::Add_Supernova(void)
 
 // Add feedback from clustered superovae according to the mass
 // and energy rate tables from superbubble calculations
-Real Grid3D::Add_Supernovae(void)
+Real Grid3D::Add_Supernovae(Real dt_old)
 {
   int i, j, k, id;
   Real x_pos, y_pos, z_pos, r, R_s, z_s, R_c, f, t, t1, t2, t3;
@@ -302,6 +302,30 @@ Real Grid3D::Add_Supernovae(void)
     N_cluster = 20;
     for (int nn=0; nn<N_cluster; nn++) {
       t_s[nn] = (nn + ns)/2;
+      t_c[nn] = t - t_s[nn];
+    }
+  }
+  else if (t >= 30 && t < 40) {
+    ns = 2*(int(t)+1 - 10);
+    N_cluster = 20 - 2*int(t-30+1) + int(t)/2 - 15;
+    for (int nn=0; nn<N_cluster; nn++) {
+      t_s[nn] = (nn+ns)/2 >? 2*(nn+ns - 45);
+      t_c[nn] = t - t_s[nn];
+    }
+  }
+  else if (t >= 40 && t < 60) {
+    ns = int(t)/2 + 41;
+    N_cluster = 5;
+    for (int nn=0; nn<N_cluster; nn++) {
+      t_s[nn] = 2*(nn+ns - 45);
+      t_c[nn] = t - t_s[nn];
+    }
+  }
+  else if (t >= 60 && t < 68) {
+    ns = int(t)/2 + 41;
+    N_cluster = 5 - int(t-60+2)/2;
+    for (int nn=0; nn<N_cluster; nn++) {
+      t_s[nn] = 2*(nn+ns - 45);
       t_c[nn] = t - t_s[nn];
     }
   }
@@ -403,39 +427,45 @@ Real Grid3D::Add_Supernovae(void)
         // within cluster radius, inject mass and thermal energy
         // entire cell is within cluster
         if (rr < R_c) {
-        //if (r < R_c) {
           if (t_c[nn] == 0) {
-          C.density[id] += M_init;
-          //C.momentum_x[id] = 0.0;
-          //C.momentum_y[id] = 0.0;
-          //C.momentum_z[id] = 0.0;
-          C.Energy[id]  += E_init;
-          #ifdef DE
-          C.GasEnergy[id] += E_init;
-          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
-          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          //printf("%2d %f %f %f Starburst zone (total) n: %e T:%e.\n", nn, x_pos, y_pos, z_pos, n, T);
-          #endif
-          M_dot_tot += M_init*H.dx*H.dy*H.dz;
-          E_dot_tot += E_init*H.dx*H.dy*H.dz;
-          #ifdef SCALAR
-          C.scalar[id] += 1.0*M_init;
-          #endif
+            C.density[id] += M_init;
+            C.Energy[id]  += E_init;
+            #ifdef DE
+            C.GasEnergy[id] += E_init;
+            //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+            //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+            //printf("%2d %f %f %f Starburst zone (total) n: %e T:%e.\n", nn, x_pos, y_pos, z_pos, n, T);
+            #endif
+            //M_dot_tot += M_init*H.dx*H.dy*H.dz;
+            //E_dot_tot += E_init*H.dx*H.dy*H.dz;
+            #ifdef SCALAR
+            C.scalar[id] += 1.0*M_init;
+            #endif
           }
           else {
-          C.density[id] += rho_dot[nn] * H.dt;
-          C.Energy[id] += Ed_dot[nn] * H.dt;
-          #ifdef DE
-          C.GasEnergy[id] += Ed_dot[nn] * H.dt;
-          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
-          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          //printf("%f %f %f Starburst zone (total) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
-          #endif
-          M_dot_tot += rho_dot[nn]*H.dx*H.dy*H.dz;
-          E_dot_tot += Ed_dot[nn]*H.dx*H.dy*H.dz;
-          #ifdef SCALAR
-          C.scalar[id] += 1.0*rho_dot[nn]*H.dt;
-          #endif
+            if (dt_old > H.dt) {
+              C.density[id] -= rho_dot[nn] * (dt_old - H.dt);
+              C.Energy[id] -= Ed_dot[nn] * (dt_old - H.dt);
+              #ifdef DE
+              C.GasEnergy[id] -= Ed_dot[nn] * (dt_old - H.dt);
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] -= 1.0*rho_dot[nn]*(dt_old - H.dt);
+              #endif
+            }
+            else {
+              C.density[id] += rho_dot[nn] * H.dt;
+              C.Energy[id] += Ed_dot[nn] * H.dt;
+              #ifdef DE
+              C.GasEnergy[id] += Ed_dot[nn] * H.dt;
+              //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+              //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+              //printf("%f %f %f Starburst zone (total) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] += 1.0*rho_dot[nn]*H.dt;
+              #endif
+            }
           }
         }
         // on the sphere
@@ -455,38 +485,47 @@ Real Grid3D::Add_Supernovae(void)
           }
           weight = incount / 1000.0;
           if (t_c[nn] == 0) {
-          C.density[id] += M_init * weight;
-          //C.momentum_x[id] = 0.0;
-          //C.momentum_y[id] = 0.0;
-          //C.momentum_z[id] = 0.0;
-          C.Energy[id]  += E_init * weight;
-          #ifdef DE
-          C.GasEnergy[id] += E_init * weight;
-          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
-          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          //printf("%2d %f %f %f Starburst zone (partial) n: %e T:%e.\n", nn, x_pos, y_pos, z_pos, n, T);
-          #endif
-          #ifdef SCALAR
-          C.scalar[id] += 1.0*weight*M_init;
-          #endif
-          M_dot_tot += M_init*weight*H.dx*H.dy*H.dz;
-          E_dot_tot += E_init*weight*H.dx*H.dy*H.dz;
+            C.density[id] += M_init * weight;
+            C.Energy[id]  += E_init * weight;
+            #ifdef DE
+            C.GasEnergy[id] += E_init * weight;
+            //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+            //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+            //printf("%2d %f %f %f Starburst zone (partial) n: %e T:%e.\n", nn, x_pos, y_pos, z_pos, n, T);
+            #endif
+            #ifdef SCALAR
+            C.scalar[id] += 1.0*weight*M_init;
+            #endif
+            //M_dot_tot += M_init*H.dx*H.dy*H.dz;
+            //E_dot_tot += E_init*H.dx*H.dy*H.dz;
           }
           else {
-          C.density[id] += rho_dot[nn] * H.dt * weight;
-          C.Energy[id]  += Ed_dot[nn] * H.dt * weight;
-          #ifdef DE
-          C.GasEnergy[id] += Ed_dot[nn] * H.dt * weight;
-          //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
-          //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
-          //printf("%f %f %f Starburst zone (partial) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
-          #endif
-          #ifdef SCALAR
-          C.scalar[id] += 1.0*weight*rho_dot[nn]*H.dt;
-          #endif
-          M_dot_tot += rho_dot[nn]*weight*H.dx*H.dy*H.dz;
-          E_dot_tot += Ed_dot[nn]*weight*H.dx*H.dy*H.dz;
+            if (dt_old > H.dt) {
+              C.density[id] -= rho_dot[nn] * (dt_old - H.dt) * weight;
+              C.Energy[id] -= Ed_dot[nn] * (dt_old - H.dt) * weight;
+              #ifdef DE
+              C.GasEnergy[id] -= Ed_dot[nn] * (dt_old - H.dt) * weight;
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] -= 1.0*rho_dot[nn]*(dt_old - H.dt) * weight;
+              #endif
+            }
+            else {
+              C.density[id] += rho_dot[nn] * H.dt * weight;
+              C.Energy[id]  += Ed_dot[nn] * H.dt * weight;
+              #ifdef DE
+              C.GasEnergy[id] += Ed_dot[nn] * H.dt * weight;
+              //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+              //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+              //printf("%f %f %f Starburst zone (partial) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] += 1.0*weight*rho_dot[nn]*H.dt;
+              #endif
+            }
           }
+          //M_dot_tot += rho_dot[nn]*H.dx*H.dy*H.dz;
+          //E_dot_tot += Ed_dot[nn]*H.dx*H.dy*H.dz;
         }
         // recalculate the timestep for these cells
         d_inv = 1.0 / C.density[id];
@@ -509,12 +548,14 @@ Real Grid3D::Add_Supernovae(void)
   }
 
   //printf("procID: %d M_dot: %e E_dot: %e\n", procID, M_dot_tot, E_dot_tot);
+  /*
   MPI_Barrier(MPI_COMM_WORLD);
   Real global_M_dot, global_E_dot;
   MPI_Reduce(&M_dot_tot, &global_M_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(&E_dot_tot, &global_E_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
   chprintf("Total M_dot: %e E_dot: %e \n", global_M_dot, global_E_dot*MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); 
   fflush(stdout);
+  */
 
   // compute max inverse of dt
   max_dti = max_vx / H.dx;
@@ -758,7 +799,8 @@ Real Grid3D::Add_Supernovae_CC85(void)
   // High res adiabatic params
   M1 = 1.5e3; 
   E1 = 1.5e42;
-  M2 = 12.0e3;
+  //M2 = 12.0e3;
+  M2 = 6.0e3;
   E2 = 5.4e42;
   M_dot = 0.0;
   E_dot = 0.0;
@@ -772,7 +814,7 @@ Real Grid3D::Add_Supernovae_CC85(void)
   t2 = tramp+thigh;
   t3 = 2*tramp+thigh;
   if (t >= 0) {
-
+/*
   if (t >= 0 && t < t1) {
     M_dot = M1 + (1.0/tramp)*t*(M2-M1); 
     E_dot = E1 + (1.0/tramp)*t*(E2-E1);
@@ -789,9 +831,9 @@ Real Grid3D::Add_Supernovae_CC85(void)
     M_dot = M1;
     E_dot = E1;
   }
-
-  //M_dot = M2;
-  //E_dot = E2;
+*/
+  M_dot = M2;
+  E_dot = E2;
 
   E_dot = E_dot*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
   V = (4.0/3.0)*PI*R_s*R_s*R_s;
@@ -827,8 +869,8 @@ Real Grid3D::Add_Supernovae_CC85(void)
 
         // within starburst radius, inject mass and thermal energy
         // entire cell is within sphere
-        if (rr < R_s) {
-        //if (r < R_s) {
+        //if (rr < R_s) {
+        if (r < R_s) {
           C.density[id] += rho_dot * H.dt;
           C.Energy[id] += Ed_dot * H.dt;
           #ifdef DE
@@ -836,6 +878,9 @@ Real Grid3D::Add_Supernovae_CC85(void)
           //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
           //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
           //printf("%3d %3d %3d Starburst zone n: %e T:%e.\n", i, j, k, n, T);
+          #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot*H.dt;
           #endif
           //M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
           //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
@@ -852,6 +897,7 @@ Real Grid3D::Add_Supernovae_CC85(void)
           max_vz = fmax(max_vz, fabs(vz) + cs);
         }
         // on the sphere
+        /*
         if (rl < R_s && rr > R_s) {
           // quick Monte Carlo to determine weighting
           Ran quickran(50);
@@ -873,6 +919,9 @@ Real Grid3D::Add_Supernovae_CC85(void)
           #ifdef DE
           C.GasEnergy[id] += Ed_dot * H.dt * weight;
           #endif
+          #ifdef SCALAR
+          C.scalar[id] += 1.0*rho_dot*H.dt * weight;
+          #endif
           // recalculate the timestep for these cells
           d_inv = 1.0 / C.density[id];
           vx = d_inv * C.momentum_x[id];
@@ -885,6 +934,7 @@ Real Grid3D::Add_Supernovae_CC85(void)
           max_vy = fmax(max_vy, fabs(vy) + cs);
           max_vz = fmax(max_vz, fabs(vz) + cs);
         }
+        */
 
       }
     }
