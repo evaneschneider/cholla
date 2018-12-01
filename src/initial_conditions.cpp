@@ -378,7 +378,9 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
         C.momentum_y[id] = 0.0;
         C.momentum_z[id] = 0.0;
         C.Energy[id]     = P/(gama-1.0);
+        #ifdef DE
         C.GasEnergy[id]  = P/(gama-1.0);
+        #endif
         // add density perturbations
         sum = 0.0;
         for (int ii=0; ii<imax; ii++) {

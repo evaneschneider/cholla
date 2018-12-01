@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
   chprintf("Initial conditions set.\n");
   // set main variables for Read_Grid inital conditions
   if (strcmp(P.init, "Read_Grid") == 0) {
-    dti = C_cfl / (0.00001*G.H.dt);
+    dti = C_cfl / (0.001*G.H.dt);
     outtime += G.H.t;
     histtime += G.H.t;
     nfile = P.nfile*P.nfull;
@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
     // Add supernovae
     //sn_dti = G.Add_Supernovae_CC85();
     //sn_dti = G.Add_Supernovae();
+    G.Add_Supernovae_S99();
      
     #ifdef SUPERNOVA
     if (G.H.t >= t_SN_next) {

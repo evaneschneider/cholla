@@ -432,6 +432,7 @@ class Grid3D
     Real Add_Supernovae(void);    
     Real Add_Supernovae_CC85(void);
     void Add_Supernovae_S99(void);
+    void Load_S99_Tables(void);
     void Fix_Cells(void);
     void Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bubble_energy, Real *bubble_energy_th);
 

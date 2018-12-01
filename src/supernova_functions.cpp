@@ -18,6 +18,7 @@
 Real M_out;
 Real Mhot_out;
 Real E_out;
+float S99_table[3][1000];
 
 //Add a single supernova with 10^51 ergs of thermal energy and 10 M_sun
 Real Grid3D::Add_Supernova(void)
@@ -538,12 +539,30 @@ Real Grid3D::Add_Supernovae_CC85(void)
 
 void get_S99_fluxes(Real *M_dot, Real *E_dot, Real t) {
 
+  int i;
+  Real del_t = 1e5;
+  t = t-2000;
+  int ts = 1e4;
+  Real tf;
+  Real M_slope, E_slope;
+  
+  // determine where in the table we are
+  // (skip the first 3.2 million years - pre SN)
+  tf = (t*1e3 + 3.2e6)/del_t;
+  i = int(tf);
+  // interpolate between the table points
+  M_slope = S99_table[1][i+1]-S99_table[1][i];
+  E_slope = S99_table[2][i+1]-S99_table[2][i];
+  
+  *M_dot = S99_table[1][i] + (tf-i)*M_slope; 
+  *E_dot = pow(10, (S99_table[2][i] + (tf-i)*E_slope) );
 
 }
 
 void Grid3D::Add_Supernovae_S99(void)
 {
   int i, j, k, id;
+  int xid_sn, yid_sn, zid_sn, nl_x, nl_y, nl_z;
   Real x_pos, y_pos, z_pos, r, R_s;
   Real M_dot, E_dot, V, rho_dot, Ed_dot;
   Real d_inv, vx, vy, vz, P, cs;
@@ -556,84 +575,121 @@ void Grid3D::Add_Supernovae_S99(void)
   M_dot = 0.0;
   E_dot = 0.0;
 
+  // return starburst 99 mass and energy fluxes, in
+  // units of M_sun/kyr and erg/s
+  // calibrated to a 10^6 M_sun cluster
   get_S99_fluxes(&M_dot, &E_dot, H.t);
+  // re-normalize to the appropriate cluster mass
+  M_dot = M_dot*10.0;
+  E_dot = E_dot*10.0;
+  //printf("M_dot: %e  E_dot: %e\n", M_dot, E_dot);
 
-  E_dot = E_dot*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); // convert to code units
+  // converts E_dot to code units
+  E_dot = E_dot*TIME_UNIT/(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT);
   V = (4.0/3.0)*PI*R_s*R_s*R_s;
-  //V = PI*R_s*R_s*2*z_s;
+  // calculate mass and energy density to be added uniformly throughout cluster
   rho_dot = M_dot / V;
   Ed_dot = E_dot / V;
   //printf("rho_dot: %f  Ed_dot: %f\n", rho_dot, Ed_dot);
 
   Real M_dot_tot, E_dot_tot;
+  M_dot_tot = 0.0;
+  E_dot_tot = 0.0;
+  // supernova center
+  xid_sn = H.nx/2 - H.n_ghost;
+  yid_sn = H.ny/2 - H.n_ghost;
+  zid_sn = H.nz/2 - H.n_ghost;
+  // how many cells to loop through around the center
+  nl_x = 5;
+  nl_y = 5;
+  nl_z = 5;
 
-  for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
-    for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
-      for (i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
+  for (int ii=xid_sn-nl_x; ii<=xid_sn+nl_x; ii++) {
+  for (int jj=yid_sn-nl_y; jj<=yid_sn+nl_y; jj++) {
+  for (int kk=zid_sn-nl_z; kk<=zid_sn+nl_z; kk++) {
 
-        id = i + j*H.nx + k*H.nx*H.ny;
+    // is this cell in your domain?
+    #ifdef MPI_CHOLLA
+    if (ii >= nx_local_start && ii < nx_local_start+nx_local && jj >= ny_local_start && jj < ny_local_start+ny_local && kk >= nz_local_start && kk < nz_local_start+nz_local) 
+    {
+    #endif
+      i = ii + H.n_ghost;
+      j = jj + H.n_ghost;
+      k = kk + H.n_ghost;
+      #ifdef MPI_CHOLLA
+      i -= nx_local_start;
+      j -= ny_local_start;
+      k -= nz_local_start;
+      #endif
 
-        Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
+      id = i + j*H.nx + k*H.nx*H.ny;
+
+      Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
         
-        // calculate spherical radius
-        xl = fabs(x_pos)-0.5*H.dx;
-        yl = fabs(y_pos)-0.5*H.dy;
-        zl = fabs(z_pos)-0.5*H.dz;
-        xr = fabs(x_pos)+0.5*H.dx;
-        yr = fabs(y_pos)+0.5*H.dy;
-        zr = fabs(z_pos)+0.5*H.dz;
-        rl = sqrt(xl*xl + yl*yl + zl*zl);
-        rr = sqrt(xr*xr + yr*yr + zr*zr);
-        r = sqrt(x_pos*x_pos + y_pos*y_pos + z_pos*z_pos);
+      // calculate spherical radius
+      xl = fabs(x_pos)-0.5*H.dx;
+      yl = fabs(y_pos)-0.5*H.dy;
+      zl = fabs(z_pos)-0.5*H.dz;
+      xr = fabs(x_pos)+0.5*H.dx;
+      yr = fabs(y_pos)+0.5*H.dy;
+      zr = fabs(z_pos)+0.5*H.dz;
+      rl = sqrt(xl*xl + yl*yl + zl*zl);
+      rr = sqrt(xr*xr + yr*yr + zr*zr);
+      r = sqrt(x_pos*x_pos + y_pos*y_pos + z_pos*z_pos);
+      //printf("%3d %3d %3d %f %f %f %f %f %f %f\n", i, j, k, x_pos, y_pos, z_pos, rl, r, rr, R_s);
 
-        // within starburst radius, inject mass and thermal energy
-        // entire cell is within sphere
-        if (rr < R_s) {
-          C.density[id] += rho_dot * H.dt;
-          C.Energy[id] += Ed_dot * H.dt;
-          #ifdef DE
-          C.GasEnergy[id] += Ed_dot * H.dt;
-          #endif
-          #ifdef SCALAR
-          C.scalar[id] += 1.0*rho_dot * H.dt;
-          #endif          
-          M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
-          E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
-        }
-        // on the sphere
-        if (rl < R_s && rr > R_s) {
-          // quick Monte Carlo to determine weighting
-          Ran quickran(50);
-          incount = 0;
-          for (ii=0; ii<1000; ii++) {
-            // generate a random number between x_pos and dx
-            xpoint = xl + H.dx*quickran.doub();
-            // generate a random number between y_pos and dy
-            ypoint = yl + H.dy*quickran.doub();
-            // generate a random number between z_pos and dz
-            zpoint = zl + H.dz*quickran.doub();
-            // check to see whether the point is within the sphere 
-            if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_s*R_s) incount++;
-            //if (xpoint*xpoint + ypoint*ypoint < R_s*R_s) incount++;
-          }
-          weight = incount / 1000.0;
-          C.density[id] += rho_dot * H.dt * weight;
-          C.Energy[id]  += Ed_dot * H.dt * weight;
-          #ifdef DE
-          C.GasEnergy[id] += Ed_dot * H.dt * weight;
-          #endif
-          #ifdef SCALAR
-          C.scalar[id] += 1.0*rho_dot * H.dt * weight;
-          #endif            
-          M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
-          E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
-        }
-
+      // within starburst radius, inject mass and thermal energy
+      // entire cell is within sphere
+      if (rr < R_s) {
+        //printf("%3d %3d %3d\n", i, j, k);
+        C.density[id] += rho_dot * H.dt;
+        C.Energy[id] += Ed_dot * H.dt;
+        #ifdef DE
+        C.GasEnergy[id] += Ed_dot * H.dt;
+        #endif
+        #ifdef SCALAR
+        C.scalar[id] += 1.0*rho_dot * H.dt;
+        #endif          
+        M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
+        E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
       }
+      // on the sphere
+      if (rl < R_s && rr > R_s) {
+        //printf("%3d %3d %3d\n", i, j, k);
+        // quick Monte Carlo to determine weighting
+        Ran quickran(50);
+        incount = 0;
+        for (int iii=0; iii<1000; iii++) {
+          // generate a random number between x_pos and dx
+          xpoint = xl + H.dx*quickran.doub();
+          // generate a random number between y_pos and dy
+          ypoint = yl + H.dy*quickran.doub();
+          // generate a random number between z_pos and dz
+          zpoint = zl + H.dz*quickran.doub();
+          // check to see whether the point is within the sphere 
+          if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_s*R_s) incount++;
+          //if (xpoint*xpoint + ypoint*ypoint < R_s*R_s) incount++;
+        }
+        weight = incount / 1000.0;
+        C.density[id] += rho_dot * H.dt * weight;
+        C.Energy[id]  += Ed_dot * H.dt * weight;
+        #ifdef DE
+        C.GasEnergy[id] += Ed_dot * H.dt * weight;
+        #endif
+        #ifdef SCALAR
+        C.scalar[id] += 1.0*rho_dot * H.dt * weight;
+        #endif            
+        M_dot_tot += rho_dot*weight*H.dx*H.dy*H.dz;
+        E_dot_tot += Ed_dot*weight*H.dx*H.dy*H.dz;
+      }
+    #ifdef MPI_CHOLLA
     }
+    #endif
+  }
+  }
   }
 
-  printf("%e %e\n", M_dot_tot, E_dot_tot*(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT)/TIME_UNIT);
+  printf("M_dot: %e E_dot: %e\n", M_dot_tot, E_dot_tot*(MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT)/TIME_UNIT);
   //Real global_M_dot, global_E_dot;
   //MPI_Reduce(&M_dot_tot, &global_M_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
   //MPI_Reduce(&E_dot_tot, &global_E_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -758,7 +814,7 @@ void Grid3D::Analysis_Functions(Real *bubble_volume, Real *bubble_mass, Real *bu
 }
 
 
-void Load_S99_Tables(void) {
+void Grid3D::Load_S99_Tables(void) {
 
   double *t_arr;
   double *M_arr;
