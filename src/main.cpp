@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
     G.H.dt = ReduceRealMin(G.H.dt);
     #endif
     if (dt_old > G.H.dt) {
-      sn_dti = G.Add_Supernovae(dt_old);
+      sn_dti = G.Add_Clusters(Clusters, dt_old);
     }
    
 

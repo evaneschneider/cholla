@@ -72,11 +72,19 @@ class Cluster
 
     /*! \var R
      *  \brief Radius of the cluster (in kpc) */
-    Real R_cl = 0.03;
+    Real R_cl;
 
     /*! \var V_cl
     *  \brief Volume of the cluster */
-    Real V_cl = (4./3.) * PI * R_cl * R_cl * R_cl;
+    Real V_cl;
+
+    /*! \var M_dot
+     *  \brief Current M_dot from S99 fluxes */
+    Real M_dot;
+
+    /*! \var E_dot
+     *  \brief Current E_dot from S99 fluxes */
+    Real E_dot;
 
     /*! \fn Initialize(void)
      *  \brief Set the initial cluster variables */
@@ -90,7 +98,7 @@ class Cluster
      *  \brief Turn the clusters on and off according to desired star formation */
     void Switch(Real t);
 
-    void get_S99_fluxes(void);
+    void Get_S99_Fluxes(void);
     
 };
 

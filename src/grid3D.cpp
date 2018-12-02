@@ -33,7 +33,7 @@
 #include "cooling_wrapper.h"
 #endif
 #ifdef CLUSTERS
-#include "clusters.h"
+#include "cluster.h"
 #endif
 
 

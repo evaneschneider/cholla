@@ -18,7 +18,7 @@ void Cluster::Initialize(Real xdglobal, Real ydglobal, Real zdglobal, Real dx) {
   flag_on = 0;
   // set the initial cluster mass, radial, azimuthal, and vertical positions from the table
   mass = cluster_list[id][0];
-  SF_cl = cluster+list[id][1];
+  SF_cl = cluster_list[id][1];
   r_pos = cluster_list[id][2];
   phi_pos = cluster_list[id][3];
   z_pos = cluster_list[id][4];
@@ -33,6 +33,9 @@ void Cluster::Initialize(Real xdglobal, Real ydglobal, Real zdglobal, Real dx) {
   k_loc = int((z_pos + 0.5*zdglobal)/dx);
 
   time = 0.0;
+
+  R_cl = 0.03;
+  V_cl = (4./3.)*PI*R_cl*R_cl*R_cl;
   
 }
 
@@ -88,7 +91,7 @@ void Cluster::Rotate(Real dt) {
   // calculate acceleration due to NFW halo & Miyamoto-Nagai disk
   a_halo = - phi_0_h * (log(1+x) - x/(1+x)) / (r_sph*r_sph);
   a_halo_r = a_halo*(r_pos/r_sph);
-  a_disk_r = - GN * M_d * r_pos * pow(r_pos*r_pos+ pow(R_d + sqrt(z_sn*z_sn + z_d*z_d),2), -1.5);
+  a_disk_r = - GN * M_d * r_pos * pow(r_pos*r_pos+ pow(R_d + sqrt(z_pos*z_pos + z_d*z_d),2), -1.5);
   // total acceleration is the sum of the halo + disk components
   a = fabs(a_halo_r) + fabs(a_disk_r);
   // radial velocity
@@ -106,7 +109,7 @@ void Cluster::Rotate(Real dt) {
 }
 
 // returns M_dot and E_dot (code units)
-void Cluster::get_S99_fluxes(void) {
+void Cluster::Get_S99_Fluxes(void) {
 
   int i;
   Real del_t = 1e5;

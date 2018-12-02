@@ -10,6 +10,7 @@
 
 #include<stdio.h>
 #include"global.h"
+#include"cluster.h"
 
 #ifdef HDF5
 #include<hdf5.h>
@@ -424,8 +425,7 @@ class Grid3D
     void Disk_3D(parameters P);    
 
     Real Add_Supernova(void);    
-    Real Add_Supernovae(Real dt_old);    
-    Real Add_Supernovae_old(void);    
+    Real Add_Clusters(Cluster Clusters[], Real dt_old);    
     Real Add_Supernovae_CC85(void);
     void Fix_Cells(void);
     void Set_Cluster_Locations(void);
