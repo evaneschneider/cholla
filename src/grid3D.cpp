@@ -32,6 +32,9 @@
 #ifdef CLOUDY_COOL
 #include "cooling_wrapper.h"
 #endif
+#ifdef CLUSTERS
+#include "clusters.h"
+#endif
 
 
 /*! \fn Grid3D(void)
@@ -249,8 +252,14 @@ void Grid3D::AllocateMemory(void)
   //printf("Warning: Cloudy cooling isn't currently working. No cooling will be applied.\n");
   Load_Cuda_Textures();
   #endif
+  
+  #ifdef S99
+  Load_S99_Table();
+  #endif  
 
-  Set_Cluster_Locations();
+  #ifdef CLUSTERS
+  Load_Cluster_List();
+  #endif
 
 }
 

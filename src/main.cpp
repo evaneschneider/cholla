@@ -13,6 +13,9 @@
 #include "grid3D.h"
 #include "io.h"
 #include "error_handling.h"
+#ifdef CLUSTERS
+#include "cluster.h"
+#endif
 
 #define OUTPUT
 //#define CPU_TIME
@@ -45,8 +48,8 @@ int main(int argc, char *argv[])
   Real outtime = 0; // current output time
 
   // SN timing variables
-  Real dt_SN = 100.0; // time between SN (code units)
-  Real t_SN_next = 0.0;
+  Real dt_SN = 1000.0; // time between SF (code units)
+  Real t_SN_next = 5000.0; // start feedback at 5 Myr
 
   // read in command line arguments
   if (argc != 2)
@@ -82,7 +85,7 @@ int main(int argc, char *argv[])
     dti = C_cfl / G.H.dt / 0.0001;
     G.H.dt = G.H.dt*0.01;
     outtime += G.H.t;
-    t_SN_next += G.H.t;
+    t_SN_next = G.H.t;
   }
 
   // set boundary conditions (assign appropriate values to ghost cells)
@@ -118,6 +121,14 @@ int main(int argc, char *argv[])
   #endif //MPI_CHOLLA
   #endif //CPU_TIME
 
+  #ifdef CLUSTERS
+  Cluster Clusters[N_CL];
+  for (int cc=0; cc<N_CL; cc++) {
+    Clusters[cc].id = cc;
+    Clusters[cc].Initialize(G.H.xdglobal, G.H.ydglobal, G.H.zdglobal, G.H.dx);
+  }
+  #endif
+
   // Evolve the grid, one timestep at a time
   chprintf("Starting calculations.\n");
   while (G.H.t < P.tout)
@@ -134,17 +145,18 @@ int main(int argc, char *argv[])
     {
       G.H.dt = outtime - G.H.t;
     }
-
-    // Add supernovae
-    Real dt_old = G.H.dt;
-    Real sn_dti = G.Add_Supernovae_CC85();
-    //Real sn_dti = G.Add_Supernovae(dt_old);
-    /*
+    
+    // turn on/off clusters based on cumulative star formation
     if (G.H.t >= t_SN_next) {
-      Real sn_dti = G.Add_Supernova();
+      for (int cc=0; cc<N_CL; cc++) {
+        Clusters[cc].Switch(G.H.t);
+      }
       t_SN_next += dt_SN;
     }
-    */
+
+    Real dt_old = G.H.dt;
+    // Add supernovae
+    Real sn_dti = G.Add_Clusters(Clusters, dt_old);
     if (sn_dti > 0) {
       if (C_cfl/sn_dti < G.H.dt) {
         printf("SN timestep is shorter. Need to correct energy input. %e %e\n", C_cfl/sn_dti, G.H.dt);

@@ -263,6 +263,208 @@ Real Grid3D::Add_Supernova(void)
 
 // Add feedback from clustered superovae according to the mass
 // and energy rate tables from superbubble calculations
+Real Grid3D::Add_Clusters(Real *Clusters, Real dt_old)
+{
+  int i, j, k, id;
+  Real x_pos, y_pos, z_pos, r, R_c, V;
+  Real rho_dot, Ed_dot;
+  Real r_cl, phi_cl, x_cl, y_cl, z_cl;
+  Real xl, xr, yl, yr, zl, zr, rl, rr;
+  int incount, ii;
+  Real weight, xpoint, ypoint, zpoint;
+  R_c = 0.03; // cluster radius, in kpc
+  V = (4./3.)*PI*R_cl*R_cl*R_cl; // volume of cluster
+
+  // how many cells to loop through around the cluster center
+  int nl_x = ceil(R_c/H.dx);
+  int nl_y = ceil(R_c/H.dy);
+  int nl_z = ceil(R_c/H.dz);
+  
+  Real d_inv, vx, vy, vz, P, cs;
+  Real max_dti, max_vx, max_vy, max_vz;
+  max_dti = max_vx = max_vy = max_vz = 0.0;
+  Real M_dot_tot, E_dot_tot;
+  M_dot_tot = E_dot_tot = 0.0;
+
+  // loop through the full list of clusters
+  for (nn = 0; nn<N_CL; nn++) {
+
+    // is the cluster on?
+    if (Clusters[nn].flag_on) {
+
+      // get the variables for the cluster location
+      x_cl = Clusters[nn].x_pos;
+      y_cl = Clusters[nn].y_pos;
+      z_cl = Clusters[nn].z_pos;
+      r_cl = Clusters[nn].r_pos;
+      phi_cl = Clusters[nn].phi_pos;
+
+      // loop through cells around the cluster center
+      for (int kk=Clusters[nn].k_loc-nl_z; kk<=Clusters[nn].k_loc+nl_z; kk++) {
+      for (int jj=Clusters[nn].j_loc-nl_y; jj<=Clusters[nn].j_loc+nl_y; jj++) {
+      for (int ii=Clusters[nn].i_loc-nl_x; ii<=Clusters[nn].i_loc+nl_x; ii++) {
+
+        // is this cell in your domain?
+        #ifdef MPI_CHOLLA
+        if (ii >= nx_local_start && ii < nx_local_start+nx_local && jj >= ny_local_start && jj < ny_local_start+ny_local && kk >= nz_local_start && kk < nz_local_start+nz_local) 
+        {
+        #endif
+          i = ii + H.n_ghost;
+          j = jj + H.n_ghost;
+          k = kk + H.n_ghost;
+          #ifdef MPI_CHOLLA
+          i -= nx_local_start;
+          j -= ny_local_start;
+          k -= nz_local_start;
+          #endif
+
+          // local domain cell id
+          id = i + j*H.nx + k*H.nx*H.ny;
+          // global position
+          Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
+/*
+          // if this cluster just turned on, find M_init and E_init
+          if (Clusters[nn].flag_on == 1) {
+            
+            // what is the density at the cluster center?
+            d_avg =  C.density[id];
+
+          }
+*/
+          // get M_dot and E_dot
+          Cluster[nn].Get_S99_Fluxes();
+          rho_dot = Cluster[nn].M_dot / V;
+          Ed_dot = Cluster[nn].E_dot / V;
+          
+
+          //printf("procID: %d  ig: %d  jg: %d  kg: %d  il: %d  jl: %d  kl: %d\n", procID, ii, jj, kk, i, j, k);
+
+          
+          // calculate radius from the cluster center
+          xl = fabs(x_pos-x_cl)-0.5*H.dx;
+          yl = fabs(y_pos-y_cl)-0.5*H.dy;
+          zl = fabs(z_pos-z_cl)-0.5*H.dz;
+          xr = fabs(x_pos-x_cl)+0.5*H.dx;
+          yr = fabs(y_pos-y_cl)+0.5*H.dy;
+          zr = fabs(z_pos-z_cl)+0.5*H.dz;
+          rl = sqrt(xl*xl + yl*yl + zl*zl);
+          rr = sqrt(xr*xr + yr*yr + zr*zr);
+          r = sqrt((x_pos-x_cl)*(x_pos-x_cl) + (y_pos-y_cl)*(y_pos-y_cl) + (z_pos-z_cl)*(z_pos-z_cl));
+
+          // within cluster radius, inject mass and thermal energy
+          // entire cell is within cluster
+          if (rr < R_c) {
+            if (dt_old > H.dt) {
+              C.density[id] -= rho_dot * (dt_old - H.dt);
+              C.Energy[id] -= Ed_dot * (dt_old - H.dt);
+              #ifdef DE
+              C.GasEnergy[id] -= Ed_dot * (dt_old - H.dt);
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] -= 1.0*rho_dot*(dt_old - H.dt);
+              #endif
+            }
+            else {
+              C.density[id] += rho_dot * H.dt;
+              C.Energy[id] += Ed_dot * H.dt;
+              #ifdef DE
+              C.GasEnergy[id] += Ed_dot * H.dt;
+              //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+              //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+              //printf("%f %f %f Starburst zone (total) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] += 1.0*rho_dot*H.dt;
+              #endif
+            }
+          }
+          // on the sphere
+          if (rl < R_c && rr > R_c) {
+            // quick Monte Carlo to determine weighting
+            Ran quickran(50);
+            incount = 0;
+            for (int mm=0; mm<1000; mm++) {
+              // generate a random number between x_pos and dx
+              xpoint = xl + H.dx*quickran.doub();
+              // generate a random number between y_pos and dy
+              ypoint = yl + H.dy*quickran.doub();
+              // generate a random number between z_pos and dz
+              zpoint = zl + H.dz*quickran.doub();
+              // check to see whether the point is within the sphere 
+              if (xpoint*xpoint + ypoint*ypoint + zpoint*zpoint < R_c*R_c) incount++;
+            }
+            weight = incount / 1000.0;
+            if (dt_old > H.dt) {
+             C.density[id] -= rho_dot * (dt_old - H.dt) * weight;
+              C.Energy[id] -= Ed_dot * (dt_old - H.dt) * weight;
+              #ifdef DE
+              C.GasEnergy[id] -= Ed_dot * (dt_old - H.dt) * weight;
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] -= 1.0*rho_dot*(dt_old - H.dt) * weight;
+              #endif
+            }
+            else {
+              C.density[id] += rho_dot * H.dt * weight;
+              C.Energy[id]  += Ed_dot * H.dt * weight;
+              #ifdef DE
+              C.GasEnergy[id] += Ed_dot * H.dt * weight;
+              //Real n = C.density[id]*DENSITY_UNIT/(0.6*MP);
+              //Real T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB);
+              //printf("%f %f %f Starburst zone (partial) n: %e T:%e.\n", x_pos, y_pos, z_pos, n, T);
+              #endif
+              #ifdef SCALAR
+              C.scalar[id] += 1.0*weight*rho_dot*H.dt;
+              #endif
+            }
+            //M_dot_tot += rho_dot[nn]*H.dx*H.dy*H.dz;
+            //E_dot_tot += Ed_dot[nn]*H.dx*H.dy*H.dz;
+          }
+          // recalculate the timestep for these cells
+          d_inv = 1.0 / C.density[id];
+          vx = d_inv * C.momentum_x[id];
+          vy = d_inv * C.momentum_y[id];
+          vz = d_inv * C.momentum_z[id];
+          P = fmax((C.Energy[id] - 0.5*C.density[id]*(vx*vx + vy*vy + vz*vz) )*(gama-1.0), TINY_NUMBER);
+          cs = sqrt(d_inv * gama * P);
+          // compute maximum cfl velocity
+          max_vx = fmax(max_vx, fabs(vx) + cs);
+          max_vy = fmax(max_vy, fabs(vy) + cs);
+          max_vz = fmax(max_vz, fabs(vz) + cs);
+        #ifdef MPI_CHOLLA
+        }
+        #endif
+      }
+      }
+      }
+
+      Cluster[nn].Rotate(H.dt);
+
+    } //cluster_on
+  } //cluster_loop
+
+  //printf("procID: %d M_dot: %e E_dot: %e\n", procID, M_dot_tot, E_dot_tot);
+  /*
+  MPI_Barrier(MPI_COMM_WORLD);
+  Real global_M_dot, global_E_dot;
+  MPI_Reduce(&M_dot_tot, &global_M_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&E_dot_tot, &global_E_dot, 1, MPI_CHREAL, MPI_SUM, 0, MPI_COMM_WORLD);
+  chprintf("Total M_dot: %e E_dot: %e \n", global_M_dot, global_E_dot*MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); 
+  fflush(stdout);
+  */
+
+  // compute max inverse of dt
+  max_dti = max_vx / H.dx;
+  max_dti = fmax(max_dti, max_vy / H.dy);
+  max_dti = fmax(max_dti, max_vz / H.dy);
+
+  return max_dti;
+
+}
+
+
+// Add feedback from clustered superovae according to the mass
+// and energy rate tables from superbubble calculations
 Real Grid3D::Add_Supernovae(Real dt_old)
 {
   int i, j, k, id;

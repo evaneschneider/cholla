@@ -42,6 +42,10 @@ typedef double Real;
 #define NSCALARS 1
 #endif
 
+#ifdef CLUSTERS
+#define N_CL 18204
+#endif
+
 
 #define SIGN(a) ( ((a) < 0.) ? -1. : 1. )
 
@@ -65,6 +69,7 @@ extern gsl_spline2d *lowT_H_spline;
 extern float *cooling_table;
 extern float *heating_table;
 #endif
+
 
 /*! \fn void Set_Gammas(Real gamma_in)
  *  \brief Set gamma values for Riemann solver. */
