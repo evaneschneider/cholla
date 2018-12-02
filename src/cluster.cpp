@@ -13,7 +13,7 @@
 float S99_table[1000][3];
 float cluster_list[N_CL][5];
 
-void Cluster::Initialize(Real xdglobal, Real ydglobal, Real zdglobal, Real dx) {
+void Cluster::Initialize(void) {
 
   flag_on = 0;
   // set the initial cluster mass, radial, azimuthal, and vertical positions from the table
@@ -26,11 +26,6 @@ void Cluster::Initialize(Real xdglobal, Real ydglobal, Real zdglobal, Real dx) {
   // calculate the global x and y positions
   x_pos = r_pos*cos(phi_pos);
   y_pos = r_pos*sin(phi_pos);
-
-  // identify the global id of the cell containing the cluster center
-  i_loc = int((x_pos + 0.5*xdglobal)/dx);
-  j_loc = int((y_pos + 0.5*ydglobal)/dx);
-  k_loc = int((z_pos + 0.5*zdglobal)/dx);
 
   time = 0.0;
 

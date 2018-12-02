@@ -50,18 +50,6 @@ class Cluster
      *  \brief Global z_position of the cluster */
     Real z_pos;
 
-    /*! \var i_loc
-     *  \brief Global i index of the cluster */
-    Real i_loc;
-
-    /*! \var j_loc
-     *  \brief Global j index of the cluster */
-    Real j_loc;
-
-    /*! \var k_loc
-     *  \brief Global k index of the cluster */
-    Real k_loc;
-
     /*! \var r_pos
      *  \brief Global radial position of the cluster */
     Real r_pos;
@@ -88,7 +76,7 @@ class Cluster
 
     /*! \fn Initialize(void)
      *  \brief Set the initial cluster variables */
-    void Initialize(Real xdglobal, Real ydglobal, Real zdglobal, Real dx);
+    void Initialize(void);
 
     /*! \fn Rotate(Real dt)
      *  \brief Rotate the cluster position given a time step */

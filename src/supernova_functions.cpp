@@ -168,14 +168,15 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
   Real r_cl, phi_cl, x_cl, y_cl, z_cl;
   Real xl, xr, yl, yr, zl, zr, rl, rr;
   int incount, ii;
+  int nl_x, nl_y, nl_z, i_cl, j_cl, k_cl;
   Real weight, xpoint, ypoint, zpoint;
   R_cl = 0.03; // cluster radius, in kpc
   V = (4./3.)*PI*R_cl*R_cl*R_cl; // volume of cluster
 
   // how many cells to loop through around the cluster center
-  int nl_x = ceil(R_cl/H.dx);
-  int nl_y = ceil(R_cl/H.dy);
-  int nl_z = ceil(R_cl/H.dz);
+  nl_x = ceil(R_cl/H.dx);
+  nl_y = ceil(R_cl/H.dy);
+  nl_z = ceil(R_cl/H.dz);
   
   Real d_inv, vx, vy, vz, P, cs;
   Real max_dti, max_vx, max_vy, max_vz;
@@ -196,10 +197,16 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
       r_cl = Clusters[nn].r_pos;
       phi_cl = Clusters[nn].phi_pos;
 
+      // identify the global id of the cell containing the cluster center
+      i_cl = int((x_cl + 0.5*H.xdglobal)/H.dx);
+      j_cl = int((y_cl + 0.5*H.ydglobal)/H.dx);
+      k_cl = int((z_cl + 0.5*H.zdglobal)/H.dx);
+      
+
       // loop through cells around the cluster center
-      for (int kk=Clusters[nn].k_loc-nl_z; kk<=Clusters[nn].k_loc+nl_z; kk++) {
-      for (int jj=Clusters[nn].j_loc-nl_y; jj<=Clusters[nn].j_loc+nl_y; jj++) {
-      for (int ii=Clusters[nn].i_loc-nl_x; ii<=Clusters[nn].i_loc+nl_x; ii++) {
+      for (int kk=k_cl-nl_z; kk<=k_cl+nl_z; kk++) {
+      for (int jj=j_cl-nl_y; jj<=j_cl+nl_y; jj++) {
+      for (int ii=i_cl-nl_x; ii<=i_cl+nl_x; ii++) {
 
         // is this cell in your domain?
         #ifdef MPI_CHOLLA

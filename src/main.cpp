@@ -123,9 +123,9 @@ int main(int argc, char *argv[])
 
   #ifdef CLUSTERS
   Cluster Clusters[N_CL];
-  for (int cc=0; cc<N_CL; cc++) {
-    Clusters[cc].id = cc;
-    Clusters[cc].Initialize(G.H.xdglobal, G.H.ydglobal, G.H.zdglobal, G.H.dx);
+  for (int nn=0; nn<N_CL; nn++) {
+    Clusters[nn].id = nn;
+    Clusters[nn].Initialize();
   }
   #endif
 
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     
     // turn on/off clusters based on cumulative star formation
     if (G.H.t >= t_SN_next) {
-      for (int cc=0; cc<N_CL; cc++) {
+      for (int nn=0; nn<N_CL; nn++) {
         Clusters[cc].Switch(G.H.t);
       }
       t_SN_next += dt_SN;
