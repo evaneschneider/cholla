@@ -17,7 +17,7 @@
 #define OUTPUT
 #define HIST
 //#define CPU_TIME
-#define SUPERNOVA
+//#define SUPERNOVA
 
 int main(int argc, char *argv[])
 {
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     // Add supernovae
     //sn_dti = G.Add_Supernovae_CC85();
     //sn_dti = G.Add_Supernovae();
-    G.Add_Supernovae_S99();
+    //G.Add_Supernovae_S99();
      
     #ifdef SUPERNOVA
     if (G.H.t >= t_SN_next) {
@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
       histtime += P.histstep;
     }
     #endif
-/*
+
     // check for failures
     for (int i=G.H.n_ghost; i<G.H.nx-G.H.n_ghost; i++) {
       for (int j=G.H.n_ghost; j<G.H.ny-G.H.n_ghost; j++) {
@@ -253,14 +253,14 @@ int main(int argc, char *argv[])
             printf("Failure in cell %d %d %d. Density %e\n", i, j, k, G.C.density[id]);
             #ifdef MPI_CHOLLA
             MPI_Finalize();
-            chexit(-1);
+            chexit(0);
             #endif
             exit(0);
           }
         }
       }
     }
-*/   
+   
 
   } /*end loop over timesteps*/
 

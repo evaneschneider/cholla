@@ -514,7 +514,7 @@ void Grid3D::Fix_Cells(void)
         // if there is a problem, replace the cell value with surrounding cell average
         if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e10) {
 
-          printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
+	//printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
 
           int idn;
           int N = 0;
@@ -592,7 +592,7 @@ void Grid3D::Fix_Cells(void)
           n = d*DENSITY_UNIT/(mu*MP);
           T = P_av*PRESSURE_UNIT/(n*KB);
 
-          printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
+          //printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T);
 
         }
       }

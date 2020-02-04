@@ -355,7 +355,7 @@ void Grid3D::Superbubble(Real rho, Real P, Real A)
     for (int jj=0; jj<imax; jj++) {
       for (int kk=0; kk<imax; kk++) {
         index = ii+imax*jj+imax*imax*kk;
-         printf("%d\n", index);
+        //printf("%d\n", index);
         theta[index] = (rand() % 1000) / 1000. * 2*PI;
       }
     }
