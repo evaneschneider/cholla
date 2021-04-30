@@ -568,11 +568,12 @@ class Grid3D
      *  \brief Initialize the grid with a 3D disk following a Miyamoto-Nagai profile. */
     void Disk_3D(parameters P);    
 
+    #ifdef CLUSTERS
     Real Add_Supernova(void);    
     Real Add_Clusters(Cluster Clusters[], Real dt_old);    
     Real Add_Supernovae_CC85(void);
-    void Fix_Cells(void);
     void Set_Cluster_Locations(void);
+    #endif
 
     /*! \fn void Set_Boundary_Conditions(parameters P)
      *  \brief Set the boundary conditions based on info in the parameters structure. */

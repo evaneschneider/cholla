@@ -217,128 +217,83 @@ void OutputData(Grid3D &G, struct parameters P, int nfile)
 /* Output a projection of the grid data to file. */
 void OutputProjectedData(Grid3D &G, struct parameters P, int nfile)
 {
-  int flag = 0;
-  int nfile = G.H.t/P.projstep;
+  char filename[100];
+  char timestep[20];
+  #ifdef HDF5
+  hid_t   file_id;
+  herr_t  status;
 
-  // status of flag determines whether to output the full grid
-  if (fmod(G.H.t, P.projstep) == 0) flag = 1;
+  // create the filename
+  strcpy(filename, P.outdir); 
+  sprintf(timestep, "%d_proj", nfile);
+  strcat(filename,timestep);   
+  strcat(filename,".h5");
 
-  if (flag == 1) {
+  #ifdef MPI_CHOLLA
+  sprintf(filename,"%s.%d",filename,procID);
+  #endif /*MPI_CHOLLA*/
 
-    char filename[100];
-    char timestep[20];
-    #ifdef HDF5
-    hid_t   file_id;
-    herr_t  status;
+  // Create a new file 
+  file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
-    // create the filename
-    strcpy(filename, P.outdir); 
-    sprintf(timestep, "%d_proj", nfile);
-    strcat(filename,timestep);   
-    strcat(filename,".h5");
+  // Write header (file attributes)
+  G.Write_Header_HDF5(file_id);
 
-    #ifdef MPI_CHOLLA
-    sprintf(filename,"%s.%d",filename,procID);
-    #endif /*MPI_CHOLLA*/
+  // Write the density and temperature projections to the output file
+  G.Write_Projection_HDF5(file_id);
 
-    // Create a new file 
-    file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  // Close the file
+  status = H5Fclose(file_id);
 
-    // Write header (file attributes)
-    G.Write_Header_HDF5(file_id);
+  #ifdef MPI_CHOLLA
+  if (status < 0) {printf("OutputProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
+  #else
+  if (status < 0) {printf("OutputProjectedData: File write failed.\n"); exit(-1); }
+  #endif
 
-    // Write the density and temperature projections to the output file
-    G.Write_Projection_HDF5(file_id);
+  #else
+  printf("OutputProjected Data only defined for hdf5 writes.\n");
+  #endif //HDF5
 
-    // Close the file
-    status = H5Fclose(file_id);
-
-    #ifdef MPI_CHOLLA
-    if (status < 0) {printf("OutputProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
-    #else
-    if (status < 0) {printf("OutputProjectedData: File write failed.\n"); exit(-1); }
-    #endif
-
-    #else
-    printf("OutputProjected Data only defined for hdf5 writes.\n");
-    #endif //HDF5
-
-  }
 }
 
 
 /* Output a rotated projection of the grid data to file. */
 void OutputRotatedProjectedData(Grid3D &G, struct parameters P, int nfile)
 {
-  int flag = 0;
-  int nfile = G.H.t/P.projstep;
+  char filename[100];
+  char timestep[20];
+  #ifdef HDF5
+  hid_t   file_id;
+  herr_t  status;
 
-  // status of flag determines whether to output the full grid
-  if (fmod(G.H.t, P.projstep) == 0) flag = 1;
+  // create the filename
+  strcpy(filename, P.outdir); 
+  sprintf(timestep, "%d_rot_proj", nfile);
+  strcat(filename,timestep);   
+  strcat(filename,".h5");
 
-  if (flag == 1) {
+  #ifdef MPI_CHOLLA
+  sprintf(filename,"%s.%d",filename,procID);
+  #endif /*MPI_CHOLLA*/
 
-    char filename[100];
-    char timestep[20];
-    #ifdef HDF5
-    hid_t   file_id;
-    herr_t  status;
+  if(G.R.flag_delta==1)
+  {
+    //if flag_delta==1, then we are just outputting a
+    //bunch of rotations of the same snapshot
+    int i_delta;
+    char fname[200];
 
-    // create the filename
-    strcpy(filename, P.outdir); 
-    sprintf(timestep, "%d_rot_proj", nfile);
-    strcat(filename,timestep);   
-    strcat(filename,".h5");
-
-    #ifdef MPI_CHOLLA
-    sprintf(filename,"%s.%d",filename,procID);
-    #endif /*MPI_CHOLLA*/
-
-    if(G.R.flag_delta==1)
+    for(i_delta=0;i_delta<G.R.n_delta;i_delta++)
     {
-      //if flag_delta==1, then we are just outputting a
-      //bunch of rotations of the same snapshot
-      int i_delta;
-      char fname[200];
+      sprintf(fname,"%s.%d",filename,G.R.i_delta);
+      chprintf("Outputting rotated projection %s.\n",fname);
 
-      for(i_delta=0;i_delta<G.R.n_delta;i_delta++)
-      {
-        sprintf(fname,"%s.%d",filename,G.R.i_delta);
-        chprintf("Outputting rotated projection %s.\n",fname);
-
-        //determine delta about z by output index
-        G.R.delta = 2.0*M_PI*((double) i_delta)/((double) G.R.n_delta);
-
-        // Create a new file 
-        file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-        // Write header (file attributes)
-        G.Write_Header_Rotated_HDF5(file_id);
-
-        // Write the density and temperature projections to the output file
-        G.Write_Rotated_Projection_HDF5(file_id);
-
-        // Close the file
-        status = H5Fclose(file_id);
-        #ifdef MPI_CHOLLA
-        if (status < 0) {printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
-        #else
-        if (status < 0) {printf("OutputRotatedProjectedData: File write failed.\n"); exit(-1); }
-        #endif
-
-        //iterate G.R.i_delta
-        G.R.i_delta++;
-      }
-
-    }
-    else if (G.R.flag_delta == 2) {
-
-      // case 2 -- outputting at a rotating delta 
-      // rotation rate given in the parameter file
-      G.R.delta = fmod(nfile*G.R.ddelta_dt*2.0*PI , (2.0*PI));
+      //determine delta about z by output index
+      G.R.delta = 2.0*M_PI*((double) i_delta)/((double) G.R.n_delta);
 
       // Create a new file 
-      file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
       // Write header (file attributes)
       G.Write_Header_Rotated_HDF5(file_id);
@@ -348,86 +303,105 @@ void OutputRotatedProjectedData(Grid3D &G, struct parameters P, int nfile)
 
       // Close the file
       status = H5Fclose(file_id);
+      #ifdef MPI_CHOLLA
+      if (status < 0) {printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
+      #else
+      if (status < 0) {printf("OutputRotatedProjectedData: File write failed.\n"); exit(-1); }
+      #endif
+
+      //iterate G.R.i_delta
+      G.R.i_delta++;
     }
-    else {
-
-      //case 0 -- just output at the delta given in the parameter file
-
-      // Create a new file 
-      file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-      // Write header (file attributes)
-      G.Write_Header_Rotated_HDF5(file_id);
-
-      // Write the density and temperature projections to the output file
-      G.Write_Rotated_Projection_HDF5(file_id);
-
-      // Close the file
-      status = H5Fclose(file_id);
-    }
-
-    #ifdef MPI_CHOLLA
-    if (status < 0) {printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
-    #else
-    if (status < 0) {printf("OutputRotatedProjectedData: File write failed.\n"); exit(-1); }
-    #endif
-
-    #else
-    printf("OutputRotatedProjectedData only defined for HDF5 writes.\n");
-    #endif
 
   }
+  else if (G.R.flag_delta == 2) {
+
+    // case 2 -- outputting at a rotating delta 
+    // rotation rate given in the parameter file
+    G.R.delta = fmod(nfile*G.R.ddelta_dt*2.0*PI , (2.0*PI));
+
+    // Create a new file 
+    file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+    // Write header (file attributes)
+    G.Write_Header_Rotated_HDF5(file_id);
+
+    // Write the density and temperature projections to the output file
+    G.Write_Rotated_Projection_HDF5(file_id);
+
+    // Close the file
+    status = H5Fclose(file_id);
+  }
+  else {
+
+   //case 0 -- just output at the delta given in the parameter file
+
+    // Create a new file 
+    file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+    // Write header (file attributes)
+    G.Write_Header_Rotated_HDF5(file_id);
+
+    // Write the density and temperature projections to the output file
+    G.Write_Rotated_Projection_HDF5(file_id);
+
+    // Close the file
+    status = H5Fclose(file_id);
+  }
+
+  #ifdef MPI_CHOLLA
+  if (status < 0) {printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID); chexit(-1); }
+  #else
+  if (status < 0) {printf("OutputRotatedProjectedData: File write failed.\n"); exit(-1); }
+  #endif
+
+  #else
+  printf("OutputRotatedProjectedData only defined for HDF5 writes.\n");
+  #endif
+
 }
 
 
 /* Output xy, xz, and yz slices of the grid data. */
 void OutputSlices(Grid3D &G, struct parameters P, int nfile)
 {
-  int flag = 0;
-  int nfile = G.H.t/P.slicestep;
+  char filename[100];
+  char timestep[20];
+  #ifdef HDF5
+  hid_t   file_id;
+  herr_t  status;
 
-  // status of flag determines whether to output the full grid
-  if (fmod(G.H.t, P.slicestep) == 0) flag = 1;
+  // create the filename
+  strcpy(filename, P.outdir); 
+  sprintf(timestep, "%d_slice", nfile);
+  strcat(filename,timestep);   
+  strcat(filename,".h5");
 
-  if (flag == 1) {
+  #ifdef MPI_CHOLLA
+  sprintf(filename,"%s.%d",filename,procID);
+  #endif /*MPI_CHOLLA*/
 
-    char filename[100];
-    char timestep[20];
-    #ifdef HDF5
-    hid_t   file_id;
-    herr_t  status;
+  // Create a new file 
+  file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
-    // create the filename
-    strcpy(filename, P.outdir); 
-    sprintf(timestep, "%d_slice", nfile);
-    strcat(filename,timestep);   
-    strcat(filename,".h5");
+  // Write header (file attributes)
+  G.Write_Header_HDF5(file_id);
 
-    #ifdef MPI_CHOLLA
-    sprintf(filename,"%s.%d",filename,procID);
-    #endif /*MPI_CHOLLA*/
+  // Write slices of all variables to the output file
+  G.Write_Slices_HDF5(file_id);
 
-    // Create a new file 
-    file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  // Close the file
+  status = H5Fclose(file_id);
 
-    // Write header (file attributes)
-    G.Write_Header_HDF5(file_id);
+ #ifdef MPI_CHOLLA
+  if (status < 0) {printf("OutputSlices: File write failed. ProcID: %d\n", procID); chexit(-1); }
+  #else
+  if (status < 0) {printf("OutputSlices: File write failed.\n"); exit(-1); }
+  #endif
+  #else
+  printf("OutputSlices only defined for hdf5 writes.\n");
+  #endif //HDF5
 
-    // Write slices of all variables to the output file
-    G.Write_Slices_HDF5(file_id);
-
-    // Close the file
-    status = H5Fclose(file_id);
-
-    #ifdef MPI_CHOLLA
-    if (status < 0) {printf("OutputSlices: File write failed. ProcID: %d\n", procID); chexit(-1); }
-    #else
-    if (status < 0) {printf("OutputSlices: File write failed.\n"); exit(-1); }
-    #endif
-    #else
-    printf("OutputSlices only defined for hdf5 writes.\n");
-    #endif //HDF5
-  }
 }
 
 /*! \fn void Write_Header_Text(FILE *fp)

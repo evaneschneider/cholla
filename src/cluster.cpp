@@ -1,5 +1,6 @@
 /*! \file cluster.cpp
  *  \brief Definitions of functions of the cluster class. */
+#ifdef CLUSTERS
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,3 +213,5 @@ void Load_S99_Table(void) {
   fclose(infile);
 
 }
+
+#endif

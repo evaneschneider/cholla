@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
   // input parameter variables
   char *param_file;
   struct parameters P;
+  int nfile = 0; // number of output files
   Real outtime = 0; // current output time
 
   // SN timing variables
@@ -89,8 +90,8 @@ int main(int argc, char *argv[])
     dti = C_cfl / G.H.dt / 0.0001;
     G.H.dt = G.H.dt*0.01;
     outtime += G.H.t;
-    t_SN_next = G.H.t;
     nfile = P.nfile;
+    t_SN_next = G.H.t;
   }
   
   #ifdef DE
@@ -160,9 +161,11 @@ int main(int argc, char *argv[])
     #endif
     WriteData(G, P, nfile);
   }
+  // add one to the output file count
+  nfile++;
   #endif //OUTPUT
   // increment the next output time
-  outtime += G.H.out_step;
+  outtime += P.outstep;
 
   #ifdef CPU_TIME
   stop_init = get_time();
@@ -196,7 +199,6 @@ int main(int argc, char *argv[])
     
     // calculate the timestep
     G.set_dt(dti);
-
 
     if (G.H.t + G.H.dt > outtime) G.H.dt = outtime - G.H.t;
 
@@ -300,9 +302,10 @@ int main(int argc, char *argv[])
       #endif
       WriteData(G, P, nfile);
       // add one to the output file count
+      nfile++;
       #endif //OUTPUT
       // update to the next output time
-      outtime += G.H.out_step;      
+      outtime += P.outstep;      
     }
         
     #ifdef CPU_TIME

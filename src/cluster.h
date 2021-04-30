@@ -1,5 +1,6 @@
 /*! \file cluster.h
  *  \brief Declarations of the cluster class. */
+#ifdef CLUSTERS
 
 #ifndef CLUSTER_H
 #define CLUSTER_H
@@ -101,3 +102,4 @@ void Load_S99_Table();
 
 #endif //CLUSTER_H
 
+#endif

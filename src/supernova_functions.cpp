@@ -1,6 +1,7 @@
 /*! \file supernova_functions.cpp
  *  \brief Definitions of functions used to add SN energy to cells.
            Functions are members of the Grid3D class. */
+#ifdef CLUSTERS
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -538,3 +539,4 @@ Real Grid3D::Add_Supernovae_CC85(void)
   return max_dti;
 
 }
+#endif
