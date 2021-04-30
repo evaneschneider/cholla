@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <set>
 #include <ctype.h>
 #include"global.h"
 
@@ -14,6 +15,15 @@
 /* Global variables */
 Real gama; // Ratio of specific heats
 Real C_cfl; // CFL number
+
+#ifdef PARTICLES
+#ifdef MPI_CHOLLA
+// Constants for the inital size of the buffers for particles transfer
+// and the number of data transfered for each particle
+int N_PARTICLES_TRANSFER;
+int N_DATA_PER_PARTICLE_TRANSFER;
+#endif
+#endif
 
 
 /*! \fn void Set_Gammas(Real gamma_in)
@@ -85,6 +95,18 @@ char *trim (char * s)
   return s;
 }
 
+const std::set<const char*> optionalParams = {"flag_delta", "ddelta_dt", "n_delta",
+       "Lz" , "Lx" , "phi" , "theta", "delta", "nzr", "nxr", "H0", "Omega_M", "Omega_L",
+       "Init_redshift", "End_redshift", "tile_length", "n_proc_x", "n_proc_y", "n_proc_z" };
+
+/*! \fn int is_param_valid(char *name);
+ * \brief Verifies that a param is valid (even if not needed).  Avoids "warnings" in output. */
+int is_param_valid(const char* param_name) {
+  for (auto it=optionalParams.begin(); it != optionalParams.end(); ++it) {
+      if (strcmp(param_name, *it) == 0) return 1;
+  }
+  return 0;
+}
 
 /*! \fn void parse_params(char *param_file, struct parameters * parms);
  *  \brief Reads the parameters in the given file into a structure. */
@@ -97,8 +119,12 @@ void parse_params (char *param_file, struct parameters * parms)
   {
     return;
   }
-  // set default file output parameter
-  parms->nfull=1;
+  // set default hydro file output parameter
+  parms->outstep_hydro=1;
+  parms->outstep_particle=1;
+  parms->outstep_slice=1;
+  parms->outstep_projection=1;
+  parms->outstep_rotated_projection=1;
 
 #ifdef ROTATED_PROJECTION
   //initialize rotation parameters to zero
@@ -109,6 +135,11 @@ void parse_params (char *param_file, struct parameters * parms)
   parms->ddelta_dt = 0;
   parms->flag_delta = 0;
 #endif /*ROTATED_PROJECTION*/
+
+#ifdef COSMOLOGY
+//Initialize file name as an empty string
+parms->scale_outputs_file[0] = '\0';
+#endif
 
 
   /* Read next line */
@@ -141,20 +172,18 @@ void parse_params (char *param_file, struct parameters * parms)
       parms->nz = atoi(value);
     else if (strcmp(name, "tout")==0)
       parms->tout = atof(value);
-    else if (strcmp(name, "gridstep")==0)
-      parms->gridstep = atof(value);
-    else if (strcmp(name, "projstep")==0)
-      parms->projstep = atof(value);
-    else if (strcmp(name, "slicestep")==0)
-      parms->slicestep = atof(value);
+    else if (strcmp(name, "outstep")==0)
+      parms->outstep = atof(value);
+    else if (strcmp(name, "n_steps_output")==0)
+      parms->n_steps_output = atoi(value);
     else if (strcmp(name, "gamma")==0)
       parms->gamma = atof(value);
     else if (strcmp(name, "init")==0)
       strncpy (parms->init, value, MAXLEN);
     else if (strcmp(name, "nfile")==0)
       parms->nfile = atoi(value);
-    else if (strcmp(name, "nfull")==0)
-      parms->nfull = atoi(value);
+    else if (strcmp(name, "outstep_hydro")==0)
+      parms->outstep_hydro = atoi(value);
     else if (strcmp(name, "xmin")==0)
       parms->xmin = atof(value);
     else if (strcmp(name, "ymin")==0)
@@ -183,6 +212,8 @@ void parse_params (char *param_file, struct parameters * parms)
       strncpy (parms->custom_bcnd, value, MAXLEN);
     else if (strcmp(name, "outdir")==0)
       strncpy (parms->outdir, value, MAXLEN);
+    else if (strcmp(name, "indir")==0)
+      strncpy (parms->indir, value, MAXLEN);
     else if (strcmp(name, "rho")==0)
       parms->rho = atof(value);
     else if (strcmp(name, "vx")==0)
@@ -231,11 +262,57 @@ void parse_params (char *param_file, struct parameters * parms)
     else if (strcmp(name, "flag_delta")==0)
       parms->flag_delta  = atoi(value);
 #endif /*ROTATED_PROJECTION*/
-    else
+#ifdef COSMOLOGY
+    else if (strcmp(name, "scale_outputs_file")==0)
+      strncpy (parms->scale_outputs_file, value, MAXLEN);
+    else if (strcmp(name, "Init_redshift")==0)
+      parms->Init_redshift  = atof(value);
+    else if (strcmp(name, "End_redshift")==0)
+      parms->End_redshift  = atof(value);
+    else if (strcmp(name, "H0")==0)
+      parms->H0  = atof(value);
+    else if (strcmp(name, "Omega_M")==0)
+      parms->Omega_M  = atof(value);
+    else if (strcmp(name, "Omega_L")==0)
+      parms->Omega_L  = atof(value);
+    else if (strcmp(name, "Omega_b")==0)
+      parms->Omega_b  = atof(value);
+#endif //COSMOLOGY
+#ifdef TILED_INITIAL_CONDITIONS
+    else if (strcmp(name, "tile_length")==0)
+      parms->tile_length  = atof(value);
+#endif //TILED_INITIAL_CONDITIONS
+
+#ifdef SET_MPI_GRID
+    // Set the MPI Processes grid [n_proc_x, n_proc_y, n_proc_z]
+    else if (strcmp(name, "n_proc_x")==0)
+      parms->n_proc_x  = atoi(value);
+    else if (strcmp(name, "n_proc_y")==0)
+      parms->n_proc_y  = atoi(value);
+    else if (strcmp(name, "n_proc_z")==0)
+      parms->n_proc_z  = atoi(value);
+#endif
+    else if (strcmp(name, "bc_potential_type")==0)
+      parms->bc_potential_type  = atoi(value);
+
+#ifdef COOLING_GRACKLE
+    else if (strcmp(name, "UVB_rates_file")==0)
+      strncpy (parms->UVB_rates_file, value, MAXLEN);
+#endif
+#ifdef ANALYSIS
+    else if (strcmp(name, "analysis_scale_outputs_file")==0)
+      strncpy (parms->analysis_scale_outputs_file, value, MAXLEN);
+    else if (strcmp(name, "analysisdir")==0)
+      strncpy (parms->analysisdir, value, MAXLEN);
+    else if (strcmp(name, "lya_skewers_stride")==0)
+      parms->lya_skewers_stride  = atoi(value);
+    else if (strcmp(name, "lya_Pk_d_log_k")==0)
+      parms->lya_Pk_d_log_k  = atof(value);
+#endif    
+    else if (!is_param_valid(name))
       printf ("WARNING: %s/%s: Unknown parameter/value pair!\n",
         name, value);
   }
-
   /* Close file */
   fclose (fp);
 }

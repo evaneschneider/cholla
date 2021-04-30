@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Example python plotting script for the 1D Sod Shock Tube test
 
 import h5py
@@ -10,13 +11,13 @@ matplotlib.rcParams['xtick.top']=True
 matplotlib.rcParams['ytick.right']=True
 import matplotlib.pyplot as plt
 
-dnamein='./hdf5/'
-dnameout='./png/'
+dnamein='./'
+dnameout='./'
 
 DE = 0 # dual energy flag - 1 if the test was run with dual energy
 i = 1 # output file number
 
-f = h5py.File('./hdf5/'+str(i)+'.h5', 'r')
+f = h5py.File(dnamein+str(i)+'.h5', 'r')
 head = f.attrs
 nx = head['dims'][0]
 gamma = head['gamma'][0]

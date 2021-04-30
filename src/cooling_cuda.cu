@@ -4,7 +4,7 @@
 #ifdef CUDA
 #ifdef COOLING_GPU
 
-#include<cuda.h>
+#include"gpu.hpp"
 #include<math.h>
 #include"global.h"
 #include"global_cuda.h"
@@ -145,8 +145,8 @@ __global__ void cooling_kernel(Real *dev_conserved, int nx, int ny, int nz, int 
     #endif
     // calculate cooling rate for new T
     cool = CIE_cool(n, T);
-    del_T = cool*dt*TIME_UNIT*(gamma-1.0)/(n*KB);
     //cool = Cloudy_cool(n, T);
+    //printf("%d %d %d %e %e %e\n", xid, yid, zid, n, T, cool);
     // only use good cells in timestep calculation (in case some have crashed)
     // don't use cells that are just going to cool down to the temperature floor
     if (n > 0 && T-del_T > T_min && cool > 0.0) {
@@ -338,12 +338,12 @@ __device__ Real CIE_cool(Real n, Real T)
 }
 
 
+#ifdef CLOUDY_COOL
 /* \fn __device__ Real Cloudy_cool(Real n, Real T)
  * \brief Uses texture mapping to interpolate Cloudy cooling/heating 
           tables at z = 0 with solar metallicity and an HM05 UV background. */
 __device__ Real Cloudy_cool(Real n, Real T)
 {
-#ifdef CLOUDY_COOL
   Real lambda = 0.0; //cooling rate, erg s^-1 cm^3
   Real H = 0.0; //heating rate, erg s^-1 cm^3
   Real cool = 0.0; //cooling per unit volume, erg /s / cm^3
@@ -366,8 +366,8 @@ __device__ Real Cloudy_cool(Real n, Real T)
   cool = n*n*(powf(10, lambda) - powf(10, H));
 
   return cool;
-#endif
 }
+#endif
 
 
 #endif //COOLING_GPU

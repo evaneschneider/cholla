@@ -2,6 +2,7 @@
 #include"mpi_routines.h"
 #include"io.h"
 #include"error_handling.h"
+#include <iostream>
 #ifdef MPI_CHOLLA
 
 void Grid3D::Set_Boundaries_MPI(struct parameters P)
@@ -23,6 +24,11 @@ void Grid3D::Set_Boundaries_MPI(struct parameters P)
       Set_Boundaries_MPI_BLOCK(flags,P);
       break;
   }
+  
+  #ifdef GRAVITY
+  Grav.Set_Boundary_Flags( flags );
+  #endif
+  
 }
 
 
@@ -66,6 +72,14 @@ void Grid3D::Set_Boundaries_MPI_SLAB(int *flags, struct parameters P)
 
 void Grid3D::Set_Boundaries_MPI_BLOCK(int *flags, struct parameters P)
 {
+  #ifdef PARTICLES
+  // Clear the vectors that contain the particles IDs to be transfred
+  if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+    Particles.Clear_Particles_For_Transfer();
+    Particles.Select_Particles_to_Transfer_All( flags );
+  }  
+  #endif
+  
   if (H.nx > 1) {
 
     /* Step 1 - Send MPI x-boundaries */
@@ -76,10 +90,14 @@ void Grid3D::Set_Boundaries_MPI_BLOCK(int *flags, struct parameters P)
     /* Step 2 - Set non-MPI x-boundaries */
     Set_Boundaries(0, flags);
     Set_Boundaries(1, flags);
-
+    
     /* Step 3 - Receive MPI x-boundaries */
     if (flags[0]==5 || flags[1]==5) {
       Wait_and_Unload_MPI_Comm_Buffers_BLOCK(0, flags);
+      #ifdef PARTICLES
+      // Unload Particles buffers when transfering Particles
+      if (Particles.TRANSFER_PARTICLES_BOUNDARIES) Wait_and_Unload_MPI_Comm_Particles_Buffers_BLOCK(0, flags);
+      #endif
     }
   }
   MPI_Barrier(world);
@@ -93,10 +111,14 @@ void Grid3D::Set_Boundaries_MPI_BLOCK(int *flags, struct parameters P)
     /* Step 5 - Set non-MPI y-boundaries */
     Set_Boundaries(2, flags);
     Set_Boundaries(3, flags);
-
+    
     /* Step 6 - Receive MPI y-boundaries */
     if (flags[2]==5 || flags[3]==5) {
       Wait_and_Unload_MPI_Comm_Buffers_BLOCK(1, flags);
+      #ifdef PARTICLES
+      // Unload Particles buffers when transfering Particles
+      if (Particles.TRANSFER_PARTICLES_BOUNDARIES) Wait_and_Unload_MPI_Comm_Particles_Buffers_BLOCK(1, flags);
+      #endif
     }
   }
   MPI_Barrier(world);
@@ -110,12 +132,20 @@ void Grid3D::Set_Boundaries_MPI_BLOCK(int *flags, struct parameters P)
     /* Step 8 - Set non-MPI z-boundaries */
     Set_Boundaries(4, flags);
     Set_Boundaries(5, flags);
-
+    
     /* Step 9 - Receive MPI z-boundaries */
     if (flags[4]==5 || flags[5]==5) {
       Wait_and_Unload_MPI_Comm_Buffers_BLOCK(2, flags);
+      #ifdef PARTICLES
+      // Unload Particles buffers when transfering Particles
+      if (Particles.TRANSFER_PARTICLES_BOUNDARIES) Wait_and_Unload_MPI_Comm_Particles_Buffers_BLOCK(2, flags);
+      #endif
     }
   }
+  
+  #ifdef PARTICLES
+  if ( Particles.TRANSFER_PARTICLES_BOUNDARIES)  Finish_Particles_Transfer();
+  #endif
 
 }
 
@@ -417,6 +447,7 @@ void Grid3D::Load_and_Send_MPI_Comm_Buffers_SLAB(int *flags)
 
     //non-blocking send left x communication buffer
     MPI_Isend(send_buffer_0, send_buffer_length, MPI_CHREAL, dest[0],   1,    world, &send_request[0]);
+    MPI_Request_free(send_request);
 
     //remember how many recv's this proc expects
     ireq++;
@@ -448,6 +479,7 @@ void Grid3D::Load_and_Send_MPI_Comm_Buffers_SLAB(int *flags)
 
     //non-blocking send right x communication buffer
     MPI_Isend(send_buffer_1, send_buffer_length, MPI_CHREAL, dest[1], 0, world, &send_request[1]);
+    MPI_Request_free(send_request+1);
 
     //remember how many recv's this proc expects
     ireq++;
@@ -456,287 +488,926 @@ void Grid3D::Load_and_Send_MPI_Comm_Buffers_SLAB(int *flags)
   //done!
 }
 
-
-void Grid3D::Load_and_Send_MPI_Comm_Buffers_BLOCK(int dir, int *flags)
-{
+// load left x communication buffer
+int Grid3D::Load_Hydro_Buffer_X0(){
   int i, j, k, ii;
   int gidx;
   int idx;
   int offset;
-  int ireq;
-  ireq = 0;
-
-  /* x boundaries */
-  if(dir == 0)
-  {
-    if (flags[0]==5) { 
-      // load left x communication buffer
-      // 1D
-      if (H.ny == 1 && H.nz == 1) {
-        offset = H.n_ghost;
-        for (i=0;i<H.n_ghost;i++) {
-          idx = (i+H.n_ghost);
-          gidx = i;
+  
+  // 1D
+  if (H.ny == 1 && H.nz == 1) {
+    offset = H.n_ghost;
+    for (i=0;i<H.n_ghost;i++) {
+      idx = (i+H.n_ghost);
+      gidx = i;
+      for (ii=0; ii<H.n_fields; ii++) {
+        *(send_buffer_x0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+      }
+    }
+  }
+  // 2D
+  if (H.ny > 1 && H.nz == 1) {
+    offset = H.n_ghost*(H.ny-2*H.n_ghost);
+    for (i=0;i<H.n_ghost;i++) {
+      for (j=0;j<H.ny-2*H.n_ghost;j++) {
+        idx = (i+H.n_ghost) + (j+H.n_ghost)*H.nx;
+        gidx = i + j*H.n_ghost;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_x0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+        } 
+      }
+    }
+  }
+  // 3D
+  if (H.ny > 1 && H.nz > 1) { 
+    offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+    for(i=0;i<H.n_ghost;i++)
+    {
+      for(j=0;j<H.ny-2*H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
           for (ii=0; ii<H.n_fields; ii++) {
             *(send_buffer_x0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
           }
         }
       }
-      // 2D
-      if (H.ny > 1 && H.nz == 1) {
-        offset = H.n_ghost*(H.ny-2*H.n_ghost);
-        for (i=0;i<H.n_ghost;i++) {
-          for (j=0;j<H.ny-2*H.n_ghost;j++) {
-            idx = (i+H.n_ghost) + (j+H.n_ghost)*H.nx;
-            gidx = i + j*H.n_ghost;
-            for (ii=0; ii<H.n_fields; ii++) {
-              *(send_buffer_x0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-            } 
-          }
-        }
-      }
-      // 3D
-      if (H.ny > 1 && H.nz > 1) { 
-        offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
-        for(i=0;i<H.n_ghost;i++)
-        {
-          for(j=0;j<H.ny-2*H.n_ghost;j++)
-          {
-            for(k=0;k<H.nz-2*H.n_ghost;k++)
-            {
-              idx  = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-              gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
-              for (ii=0; ii<H.n_fields; ii++) {
-                *(send_buffer_x0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-              }
-            }
-          }
-        }
-      }
-
-   
-      //post non-blocking receive left x communication buffer
-      MPI_Irecv(recv_buffer_x0, x_buffer_length, MPI_CHREAL, source[0], 0, world, &recv_request[ireq]);
-
-      //non-blocking send left x communication buffer
-      MPI_Isend(send_buffer_x0, x_buffer_length, MPI_CHREAL, dest[0],   1, world, &send_request[0]);
-
-      //keep track of how many sends and receives are expected
-      ireq++;
     }
+  }
 
-    if(flags[1]==5)
+  return x_buffer_length;  
+}
+
+
+int Grid3D::Load_Hydro_DeviceBuffer_X0(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  Real *c_head;
+  
+  c_head = (Real *)C.device;
+  
+  // 1D
+  if (H.ny == 1 && H.nz == 1) {
+    offset = H.n_ghost;
+    #pragma omp target teams distribute parallel for \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_x0, c_head )
+    for (i=0;i<H.n_ghost;i++) {
+      idx = (i+H.n_ghost);
+      gidx = i;
+      for (ii=0; ii<H.n_fields; ii++) {
+        *(send_buffer_x0 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+      }
+    }
+  }
+  // 2D
+  if (H.ny > 1 && H.nz == 1) {
+    offset = H.n_ghost*(H.ny-2*H.n_ghost);
+    #pragma omp target teams distribute parallel for collapse ( 2 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_x0, c_head )
+    for (i=0;i<H.n_ghost;i++) {
+      for (j=0;j<H.ny-2*H.n_ghost;j++) {
+        idx = (i+H.n_ghost) + (j+H.n_ghost)*H.nx;
+        gidx = i + j*H.n_ghost;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_x0 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+        } 
+      }
+    }
+  }
+  // 3D
+  if (H.ny > 1 && H.nz > 1) { 
+    offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+    #pragma omp target teams distribute parallel for collapse ( 3 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_x0, c_head )
+    for(i=0;i<H.n_ghost;i++)
     {
-      // load right x communication buffer
-      // 1D
-      if (H.ny == 1 && H.nz == 1) {
-        offset = H.n_ghost;
-        for (i=0;i<H.n_ghost;i++) {
-          idx = (i+H.nx-2*H.n_ghost);
-          gidx = i;
+      for(j=0;j<H.ny-2*H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = (i+H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+          for (ii=0; ii<H.n_fields; ii++) {
+            *(send_buffer_x0 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+          }
+        }
+      }
+    }
+  }
+
+  return x_buffer_length;  
+}
+
+
+// load right x communication buffer
+int Grid3D::Load_Hydro_Buffer_X1(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  
+  // 1D
+  if (H.ny == 1 && H.nz == 1) {
+    offset = H.n_ghost;
+    for (i=0;i<H.n_ghost;i++) {
+      idx = (i+H.nx-2*H.n_ghost);
+      gidx = i;
+      for (ii=0; ii<H.n_fields; ii++) {
+        *(send_buffer_x1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+      }
+    }
+  }
+  // 2D
+  if (H.ny > 1 && H.nz == 1) {
+    offset = H.n_ghost*(H.ny-2*H.n_ghost);
+    for (i=0;i<H.n_ghost;i++) {
+      for (j=0;j<H.ny-2*H.n_ghost;j++) {
+        idx = (i+H.nx-2*H.n_ghost) + (j+H.n_ghost)*H.nx;
+        gidx = i + j*H.n_ghost;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_x1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  // 3D
+  if (H.ny > 1 && H.nz > 1) { 
+    offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+    for(i=0;i<H.n_ghost;i++)
+    {
+      for(j=0;j<H.ny-2*H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = (i+H.nx-2*H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
           for (ii=0; ii<H.n_fields; ii++) {
             *(send_buffer_x1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
           }
         }
       }
-      // 2D
-      if (H.ny > 1 && H.nz == 1) {
-        offset = H.n_ghost*(H.ny-2*H.n_ghost);
-        for (i=0;i<H.n_ghost;i++) {
-          for (j=0;j<H.ny-2*H.n_ghost;j++) {
-            idx = (i+H.nx-2*H.n_ghost) + (j+H.n_ghost)*H.nx;
-            gidx = i + j*H.n_ghost;
-            for (ii=0; ii<H.n_fields; ii++) {
-              *(send_buffer_x1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-            }
-          }
-        }
-      }
-      // 3D
-      if (H.ny > 1 && H.nz > 1) { 
-        offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
-        for(i=0;i<H.n_ghost;i++)
-        {
-          for(j=0;j<H.ny-2*H.n_ghost;j++)
-          {
-            for(k=0;k<H.nz-2*H.n_ghost;k++)
-            {
-              idx  = (i+H.nx-2*H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-              gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
-              for (ii=0; ii<H.n_fields; ii++) {
-                *(send_buffer_x1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-              }
-            }
-          }
-        }
-      }
-
-      //post non-blocking receive right x communication buffer
-      MPI_Irecv(recv_buffer_x1, x_buffer_length, MPI_CHREAL, source[1], 1, world, &recv_request[ireq]);
-
-      //non-blocking send right x communication buffer
-      MPI_Isend(send_buffer_x1, x_buffer_length, MPI_CHREAL, dest[1],   0, world, &send_request[1]);
-
-      //keep track of how many sends and receives are expected
-      ireq++;
     }
+  }
+  return x_buffer_length;
+}
+
+
+// load right x communication buffer
+int Grid3D::Load_Hydro_DeviceBuffer_X1(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  Real *c_head;
+  
+  c_head = (Real *)C.device;
+  
+  // 1D
+  if (H.ny == 1 && H.nz == 1) {
+    offset = H.n_ghost;
+    #pragma omp target teams distribute parallel for \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_x1, c_head )
+    for (i=0;i<H.n_ghost;i++) {
+      idx = (i+H.nx-2*H.n_ghost);
+      gidx = i;
+      for (ii=0; ii<H.n_fields; ii++) {
+        *(send_buffer_x1 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+      }
+    }
+  }
+  // 2D
+  if (H.ny > 1 && H.nz == 1) {
+    offset = H.n_ghost*(H.ny-2*H.n_ghost);
+    #pragma omp target teams distribute parallel for collapse ( 2 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_x1, c_head )
+    for (i=0;i<H.n_ghost;i++) {
+      for (j=0;j<H.ny-2*H.n_ghost;j++) {
+        idx = (i+H.nx-2*H.n_ghost) + (j+H.n_ghost)*H.nx;
+        gidx = i + j*H.n_ghost;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_x1 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  // 3D
+  if (H.ny > 1 && H.nz > 1) { 
+    offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+    #pragma omp target teams distribute parallel for collapse ( 3 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_x1, c_head )
+    for(i=0;i<H.n_ghost;i++)
+    {
+      for(j=0;j<H.ny-2*H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = (i+H.nx-2*H.n_ghost) + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+          for (ii=0; ii<H.n_fields; ii++) {
+            *(send_buffer_x1 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+          }
+        }
+      }
+    }
+  }
+  
+  return x_buffer_length;
+}
+
+// load left y communication buffer
+int Grid3D::Load_Hydro_Buffer_Y0(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  // 2D
+  if (H.nz == 1) {
+    offset = H.n_ghost*H.nx;
+    for (i=0;i<H.nx;i++) {
+      for (j=0;j<H.n_ghost;j++) {
+        idx = i + (j+H.n_ghost)*H.nx;
+        gidx = i + j*H.nx;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_y0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  // 3D
+  if (H.nz > 1) { 
+    offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+    for(i=0;i<H.nx;i++)
+    {
+      for(j=0;j<H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = i + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+          for (ii=0; ii<H.n_fields; ii++) {
+            *(send_buffer_y0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+          }
+        }
+      }
+    }
+  }  
+  return y_buffer_length;
+}
+
+
+// load left y communication buffer
+int Grid3D::Load_Hydro_DeviceBuffer_Y0(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  Real *c_head;
+  
+  c_head = (Real *)C.device;
+  
+  // 2D
+  if (H.nz == 1) {
+    offset = H.n_ghost*H.nx;
+    #pragma omp target teams distribute parallel for collapse ( 2 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_y0, c_head )
+    for (i=0;i<H.nx;i++) {
+      for (j=0;j<H.n_ghost;j++) {
+        idx = i + (j+H.n_ghost)*H.nx;
+        gidx = i + j*H.nx;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_y0 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  // 3D
+  if (H.nz > 1) { 
+    offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+    #pragma omp target teams distribute parallel for collapse ( 3 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_y0, c_head )
+    for(i=0;i<H.nx;i++)
+    {
+      for(j=0;j<H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = i + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+          for (ii=0; ii<H.n_fields; ii++) {
+            *(send_buffer_y0 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+          }
+        }
+      }
+    }
+  }
+  return y_buffer_length;
+}
+
+
+// load right y communication buffer
+int Grid3D::Load_Hydro_Buffer_Y1(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  // 2D
+  if (H.nz == 1) {
+    offset = H.n_ghost*H.nx;
+    for (i=0;i<H.nx;i++) {
+      for (j=0;j<H.n_ghost;j++) {
+        idx = i + (j+H.ny-2*H.n_ghost)*H.nx;
+        gidx = i + j*H.nx;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_y1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  // 3D
+  if (H.nz > 1) { 
+    offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+    for(i=0;i<H.nx;i++)
+    {
+      for(j=0;j<H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = i + (j+H.ny-2*H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+          for (ii=0; ii<H.n_fields; ii++) {
+            *(send_buffer_y1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+          }
+        }
+      }
+    }
+  }
+  return y_buffer_length;
+}
+
+
+int Grid3D::Load_Hydro_DeviceBuffer_Y1(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  Real *c_head;
+  
+  c_head = (Real *)C.device;
+  
+  // 2D
+  if (H.nz == 1) {
+    offset = H.n_ghost*H.nx;
+    #pragma omp target teams distribute parallel for collapse ( 2 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_y1, c_head )
+    for (i=0;i<H.nx;i++) {
+      for (j=0;j<H.n_ghost;j++) {
+        idx = i + (j+H.ny-2*H.n_ghost)*H.nx;
+        gidx = i + j*H.nx;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_y1 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  // 3D
+  if (H.nz > 1) { 
+    offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+    #pragma omp target teams distribute parallel for collapse ( 2 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_y1, c_head )
+    for(i=0;i<H.nx;i++)
+    {
+      for(j=0;j<H.n_ghost;j++)
+      {
+        for(k=0;k<H.nz-2*H.n_ghost;k++)
+        {
+          idx  = i + (j+H.ny-2*H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+          gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+          for (ii=0; ii<H.n_fields; ii++) {
+            *(send_buffer_y1 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+          }
+        }
+      }
+    }
+  }
+  return y_buffer_length;
+}
+
+// load left z communication buffer
+int Grid3D::Load_Hydro_Buffer_Z0(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  // 3D
+  offset = H.n_ghost*H.nx*H.ny;
+  for(i=0;i<H.nx;i++)
+  {
+    for(j=0;j<H.ny;j++)
+    {
+      for(k=0;k<H.n_ghost;k++)
+      {
+        idx  = i + j*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+        gidx = i + j*H.nx + k*H.nx*H.ny;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_z0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  
+  return z_buffer_length;
+}
+
+// load left z communication buffer
+int Grid3D::Load_Hydro_DeviceBuffer_Z0(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  Real *c_head;
+  
+  c_head = (Real *)C.device;
+  
+  // 3D
+  offset = H.n_ghost*H.nx*H.ny;
+  #pragma omp target teams distribute parallel for collapse ( 3 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_z0, c_head )
+  for(i=0;i<H.nx;i++)
+  {
+    for(j=0;j<H.ny;j++)
+    {
+      for(k=0;k<H.n_ghost;k++)
+      {
+        idx  = i + j*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+        gidx = i + j*H.nx + k*H.nx*H.ny;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_z0 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+
+  return z_buffer_length;
+}
+
+// load right z communication buffer
+int Grid3D::Load_Hydro_Buffer_Z1(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  offset = H.n_ghost*H.nx*H.ny;
+  for(i=0;i<H.nx;i++)
+  {
+    for(j=0;j<H.ny;j++)
+    {
+      for(k=0;k<H.n_ghost;k++)
+      {
+        idx  = i + j*H.nx + (k+H.nz-2*H.n_ghost)*H.nx*H.ny;
+        gidx = i + j*H.nx + k*H.nx*H.ny;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_z1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  return z_buffer_length;
+}
+
+
+int Grid3D::Load_Hydro_DeviceBuffer_Z1(){
+  int i, j, k, ii;
+  int gidx;
+  int idx;
+  int offset;
+  Real *c_head;
+  
+  c_head = (Real *)C.device;
+  offset = H.n_ghost*H.nx*H.ny;
+  #pragma omp target teams distribute parallel for collapse ( 3 ) \
+            private ( idx, gidx ) \
+            firstprivate ( offset ) \
+            is_device_ptr ( send_buffer_z1, c_head )
+  for(i=0;i<H.nx;i++)
+  {
+    for(j=0;j<H.ny;j++)
+    {
+      for(k=0;k<H.n_ghost;k++)
+      {
+        idx  = i + j*H.nx + (k+H.nz-2*H.n_ghost)*H.nx*H.ny;
+        gidx = i + j*H.nx + k*H.nx*H.ny;
+        for (ii=0; ii<H.n_fields; ii++) {
+          *(send_buffer_z1 + gidx + ii*offset) = c_head[idx + ii*H.n_cells];
+        }
+      }
+    }
+  }
+  return z_buffer_length;
+}
+
+
+void Grid3D::Load_and_Send_MPI_Comm_Buffers_BLOCK(int dir, int *flags)
+{
+  
+  #ifdef PARTICLES
+  // Select wich particles need to be transfred for this direction
+  // if ( Particles.TRANSFER_PARTICLES_BOUNDARIES) Particles.Select_Particles_to_Transfer( dir );
+  
+  // Initialize MPI requests for particles transfers
+  int ireq_n_particles, ireq_particles_transfer;
+  ireq_n_particles = 0;
+  ireq_particles_transfer = 0;
+  #endif
+
+  int ireq;
+  ireq = 0;
+
+  int buffer_length;
+  
+  // Flag to ommit the transfer of the main buffer when tharnsfering the particles buffer
+  bool transfer_main_buffer = true;
+  
+  /* x boundaries */
+  if(dir == 0)
+  {
+    if (flags[0]==5) { 
+      
+      // load left x communication buffer
+      if ( H.TRANSFER_HYDRO_BOUNDARIES ) 
+        {
+        #ifdef GPU_MPI
+        buffer_length = Load_Hydro_DeviceBuffer_X0();
+        #else
+        buffer_length = Load_Hydro_Buffer_X0();
+        #endif
+        }
+      
+      #ifdef GRAVITY 
+      if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Gravity_Potential_To_Buffer_GPU( 0, 0, send_buffer_x0, 0 );
+        #else
+        buffer_length = Load_Gravity_Potential_To_Buffer( 0, 0, send_buffer_x0, 0 );
+        #endif
+        
+      }
+      #ifdef SOR
+      if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES )  buffer_length = Load_Poisson_Boundary_To_Buffer( 0, 0, send_buffer_x0 );
+      #endif //SOR
+      #endif //GRAVITY
+      
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_DENSITY_BOUNDARIES) {
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer_GPU( 0, 0, send_buffer_x0  );
+        #else
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer( 0, 0, send_buffer_x0  );
+        #endif
+      } 
+      else if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+        Load_and_Send_Particles_X0( ireq_n_particles, ireq_particles_transfer );
+        transfer_main_buffer = false;
+        ireq_n_particles ++;
+        ireq_particles_transfer ++;
+      }
+      #endif
+   
+      if ( transfer_main_buffer ){
+        //post non-blocking receive left x communication buffer
+        MPI_Irecv(recv_buffer_x0, buffer_length, MPI_CHREAL, source[0], 0, world, &recv_request[ireq]);
+
+        //non-blocking send left x communication buffer
+        MPI_Isend(send_buffer_x0, buffer_length, MPI_CHREAL, dest[0],   1, world, &send_request[0]);
+        MPI_Request_free(send_request);
+
+        //keep track of how many sends and receives are expected
+        ireq++;
+      }
+    }
+
+    if(flags[1]==5)
+    {
+      // load right x communication buffer
+      if ( H.TRANSFER_HYDRO_BOUNDARIES ) 
+        {
+        #ifdef GPU_MPI
+        buffer_length = Load_Hydro_DeviceBuffer_X1();
+        #else
+        buffer_length = Load_Hydro_Buffer_X1();
+        #endif
+        //printf("X1 len: %d\n", buffer_length);
+        }
+      
+      #ifdef GRAVITY
+      if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Gravity_Potential_To_Buffer_GPU( 0, 1, send_buffer_x1, 0 );
+        #else
+        buffer_length = Load_Gravity_Potential_To_Buffer( 0, 1, send_buffer_x1, 0 );
+        #endif
+      }
+      #ifdef SOR
+      if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES )  buffer_length = Load_Poisson_Boundary_To_Buffer( 0, 1, send_buffer_x1 );
+      #endif //SOR
+      #endif //GRAVITY
+      
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_DENSITY_BOUNDARIES) {
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer_GPU( 0, 1, send_buffer_x1  );
+        #else
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer( 0, 1, send_buffer_x1  );
+        #endif
+      }
+      else if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+        Load_and_Send_Particles_X1( ireq_n_particles, ireq_particles_transfer );
+        transfer_main_buffer = false;
+        ireq_n_particles ++;
+        ireq_particles_transfer ++;
+      }
+      #endif
+      
+      if ( transfer_main_buffer ){
+        //post non-blocking receive right x communication buffer
+        MPI_Irecv(recv_buffer_x1, buffer_length, MPI_CHREAL, source[1], 1, world, &recv_request[ireq]);
+
+        //non-blocking send right x communication buffer
+        MPI_Isend(send_buffer_x1, buffer_length, MPI_CHREAL, dest[1],   0, world, &send_request[1]);
+        MPI_Request_free(send_request+1);
+
+        //keep track of how many sends and receives are expected
+        ireq++;
+      }
+    }
+    // Receive the number of particles transfer for X
+    #ifdef PARTICLES
+    if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ) Wait_NTransfer_and_Request_Recv_Particles_Transfer_BLOCK( dir, flags );
+    #endif
 
   }
 
   /* y boundaries */
   if (dir==1) {
-    // load left y communication buffer
     if(flags[2] == 5)
     {
-      // 2D
-      if (H.nz == 1) {
-        offset = H.n_ghost*H.nx;
-        for (i=0;i<H.nx;i++) {
-          for (j=0;j<H.n_ghost;j++) {
-            idx = i + (j+H.n_ghost)*H.nx;
-            gidx = i + j*H.nx;
-            for (ii=0; ii<H.n_fields; ii++) {
-              *(send_buffer_y0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-            }
-          }
-        }
-      }
-      // 3D
-      if (H.nz > 1) { 
-        offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
-        for(i=0;i<H.nx;i++)
+      // load left y communication buffer
+      if ( H.TRANSFER_HYDRO_BOUNDARIES ) 
         {
-          for(j=0;j<H.n_ghost;j++)
-          {
-            for(k=0;k<H.nz-2*H.n_ghost;k++)
-            {
-              idx  = i + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-              gidx = i + j*H.nx + k*H.nx*H.n_ghost;
-              for (ii=0; ii<H.n_fields; ii++) {
-                *(send_buffer_y0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-              }
-            }
-          }
+        #ifdef GPU_MPI
+        buffer_length = Load_Hydro_DeviceBuffer_Y0();
+        #else
+        buffer_length = Load_Hydro_Buffer_Y0();
+        #endif
+        //printf("Y0 len: %d\n", buffer_length);
         }
-      }
       
-      //post non-blocking receive left y communication buffer
-      MPI_Irecv(recv_buffer_y0, y_buffer_length, MPI_CHREAL, source[2], 2, world, &recv_request[ireq]);
+      #ifdef GRAVITY
+      if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Gravity_Potential_To_Buffer_GPU( 1, 0, send_buffer_y0, 0 );
+        #else
+        buffer_length = Load_Gravity_Potential_To_Buffer( 1, 0, send_buffer_y0, 0 );
+        #endif
+      }
+      #ifdef SOR
+      if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES )  buffer_length = Load_Poisson_Boundary_To_Buffer( 1, 0, send_buffer_y0 );
+      #endif //SOR
+      #endif //GRAVITY
+      
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_DENSITY_BOUNDARIES) {
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer_GPU( 1, 0, send_buffer_y0  );
+        #else
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer( 1, 0, send_buffer_y0  );
+        #endif
+      }
+      else if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+        Load_and_Send_Particles_Y0( ireq_n_particles, ireq_particles_transfer );
+        transfer_main_buffer = false;
+        ireq_n_particles ++;
+        ireq_particles_transfer ++;
+      }
+      #endif
+      
+      if ( transfer_main_buffer ){
+        //post non-blocking receive left y communication buffer
+        MPI_Irecv(recv_buffer_y0, buffer_length, MPI_CHREAL, source[2], 2, world, &recv_request[ireq]);
 
-      //non-blocking send left y communication buffer
-      MPI_Isend(send_buffer_y0, y_buffer_length, MPI_CHREAL, dest[2],   3, world, &send_request[0]);
+        //non-blocking send left y communication buffer
+        MPI_Isend(send_buffer_y0, buffer_length, MPI_CHREAL, dest[2],   3, world, &send_request[0]);
+        MPI_Request_free(send_request);
 
-      //keep track of how many sends and receives are expected
-      ireq++;
+        //keep track of how many sends and receives are expected
+        ireq++;
+      }
     }
 
-    // load right y communication buffer
     if(flags[3]==5)
     {
-      // 2D
-      if (H.nz == 1) {
-        offset = H.n_ghost*H.nx;
-        for (i=0;i<H.nx;i++) {
-          for (j=0;j<H.n_ghost;j++) {
-            idx = i + (j+H.ny-2*H.n_ghost)*H.nx;
-            gidx = i + j*H.nx;
-            for (ii=0; ii<H.n_fields; ii++) {
-              *(send_buffer_y1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-            }
-          }
-        }
-      }
-      // 3D
-      if (H.nz > 1) { 
-        offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
-        for(i=0;i<H.nx;i++)
+      // load right y communication buffer
+      if ( H.TRANSFER_HYDRO_BOUNDARIES ) 
         {
-          for(j=0;j<H.n_ghost;j++)
-          {
-            for(k=0;k<H.nz-2*H.n_ghost;k++)
-            {
-              idx  = i + (j+H.ny-2*H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-              gidx = i + j*H.nx + k*H.nx*H.n_ghost;
-              for (ii=0; ii<H.n_fields; ii++) {
-                *(send_buffer_y1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-              }
-            }
-          }
+        #ifdef GPU_MPI
+        buffer_length = Load_Hydro_DeviceBuffer_Y1();
+        #else
+        buffer_length = Load_Hydro_Buffer_Y1();
+        #endif
+        //printf("Y1 len: %d\n", buffer_length);
         }
-      }
+        
       
-      //post non-blocking receive right y communication buffer
-      MPI_Irecv(recv_buffer_y1, y_buffer_length, MPI_CHREAL, source[3], 3, world, &recv_request[ireq]);
+      #ifdef GRAVITY
+      if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Gravity_Potential_To_Buffer_GPU( 1, 1, send_buffer_y1, 0 );
+        #else
+        buffer_length = Load_Gravity_Potential_To_Buffer( 1, 1, send_buffer_y1, 0 );
+        #endif
+      }
+      #ifdef SOR
+      if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES )  buffer_length = Load_Poisson_Boundary_To_Buffer( 1, 1, send_buffer_y1 );
+      #endif //SOR
+      #endif //GRAVITY
+      
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_DENSITY_BOUNDARIES) {
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer_GPU( 1, 1, send_buffer_y1  );
+        #else
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer( 1, 1, send_buffer_y1  );
+        #endif
+      }
+      else if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+        Load_and_Send_Particles_Y1( ireq_n_particles, ireq_particles_transfer );
+        transfer_main_buffer = false;
+        ireq_n_particles ++;
+        ireq_particles_transfer ++;
+      }
+      #endif
+      
+      if ( transfer_main_buffer ){      
+        //post non-blocking receive right y communication buffer
+        MPI_Irecv(recv_buffer_y1, buffer_length, MPI_CHREAL, source[3], 3, world, &recv_request[ireq]);
 
-      //non-blocking send right y communication buffer
-      MPI_Isend(send_buffer_y1, y_buffer_length, MPI_CHREAL, dest[3],   2, world, &send_request[1]);
+        //non-blocking send right y communication buffer
+        MPI_Isend(send_buffer_y1, buffer_length, MPI_CHREAL, dest[3],   2, world, &send_request[1]);
+        MPI_Request_free(send_request+1);
 
-      //keep track of how many sends and receives are expected
-      ireq++;
+        //keep track of how many sends and receives are expected
+        ireq++;
+      }
     }
+    // Receive the number of particles transfer for Y
+    #ifdef PARTICLES
+    if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ) Wait_NTransfer_and_Request_Recv_Particles_Transfer_BLOCK( dir, flags );
+    #endif
+
   }
 
   /* z boundaries */
   if (dir==2) {
 
-    // left z communication buffer
     if(flags[4]==5)
     {
-      // 3D
-      offset = H.n_ghost*H.nx*H.ny;
-      for(i=0;i<H.nx;i++)
-      {
-        for(j=0;j<H.ny;j++)
+      // left z communication buffer
+      if ( H.TRANSFER_HYDRO_BOUNDARIES ) 
         {
-          for(k=0;k<H.n_ghost;k++)
-          {
-            idx  = i + j*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-            gidx = i + j*H.nx + k*H.nx*H.ny;
-            for (ii=0; ii<H.n_fields; ii++) {
-              *(send_buffer_z0 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-            }
-          }
+        #ifdef GPU_MPI
+        buffer_length = Load_Hydro_DeviceBuffer_Z0();
+        #else
+        buffer_length = Load_Hydro_Buffer_Z0();
+        #endif
+        //printf("Z0 len: %d\n", buffer_length);
         }
-      }
       
-      //post non-blocking receive left z communication buffer
-      MPI_Irecv(recv_buffer_z0, z_buffer_length, MPI_CHREAL, source[4], 4, world, &recv_request[ireq]);
+      #ifdef GRAVITY
+      if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Gravity_Potential_To_Buffer_GPU( 2, 0, send_buffer_z0, 0 );
+        #else
+        buffer_length = Load_Gravity_Potential_To_Buffer( 2, 0, send_buffer_z0, 0 );
+        #endif
+      }
+      #ifdef SOR
+      if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES )  buffer_length = Load_Poisson_Boundary_To_Buffer( 2, 0, send_buffer_z0 );
+      #endif //SOR
+      #endif //GRAVITY
+      
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_DENSITY_BOUNDARIES) {
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer_GPU( 2, 0, send_buffer_z0  );
+        #else
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer( 2, 0, send_buffer_z0  );
+        #endif
+      }
+      else if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+        Load_and_Send_Particles_Z0( ireq_n_particles, ireq_particles_transfer );
+        transfer_main_buffer = false;
+        ireq_n_particles ++;
+        ireq_particles_transfer ++;
+      }
+      #endif
+      
+      if ( transfer_main_buffer ){      
+        //post non-blocking receive left z communication buffer
+        MPI_Irecv(recv_buffer_z0, buffer_length, MPI_CHREAL, source[4], 4, world, &recv_request[ireq]);
 
-      //non-blocking send left z communication buffer
-      MPI_Isend(send_buffer_z0, z_buffer_length, MPI_CHREAL, dest[4],   5, world, &send_request[0]);
+        //non-blocking send left z communication buffer
+        MPI_Isend(send_buffer_z0, buffer_length, MPI_CHREAL, dest[4],   5, world, &send_request[0]);
+        MPI_Request_free(send_request);
 
-      //keep track of how many sends and receives are expected
-      ireq++;
+        //keep track of how many sends and receives are expected
+        ireq++;
+      }
     }
 
-    // load right z communication buffer
     if(flags[5]==5)
     {
-      offset = H.n_ghost*H.nx*H.ny;
-      for(i=0;i<H.nx;i++)
-      {
-        for(j=0;j<H.ny;j++)
+      // load right z communication buffer
+      if ( H.TRANSFER_HYDRO_BOUNDARIES ) 
         {
-          for(k=0;k<H.n_ghost;k++)
-          {
-            idx  = i + j*H.nx + (k+H.nz-2*H.n_ghost)*H.nx*H.ny;
-            gidx = i + j*H.nx + k*H.nx*H.ny;
-            for (ii=0; ii<H.n_fields; ii++) {
-              *(send_buffer_z1 + gidx + ii*offset) = C.density[idx + ii*H.n_cells];
-            }
-          }
+        #ifdef GPU_MPI
+        buffer_length = Load_Hydro_DeviceBuffer_Z1();
+        #else
+        buffer_length = Load_Hydro_Buffer_Z1();
+        #endif
+        //printf("Z1 len: %d\n", buffer_length);
         }
+              
+      #ifdef GRAVITY
+      if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Gravity_Potential_To_Buffer_GPU( 2, 1, send_buffer_z1, 0 );
+        #else
+        buffer_length = Load_Gravity_Potential_To_Buffer( 2, 1, send_buffer_z1, 0 );
+        #endif
       }
+      #ifdef SOR
+      if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES )  buffer_length = Load_Poisson_Boundary_To_Buffer( 2, 1, send_buffer_z1 );
+      #endif //SOR
+      #endif //GRAVITY
       
-      //post non-blocking receive right x communication buffer
-      MPI_Irecv(recv_buffer_z1, z_buffer_length, MPI_CHREAL, source[5], 5, world, &recv_request[ireq]);
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_DENSITY_BOUNDARIES) {
+        #ifdef GRAVITY_GPU
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer_GPU( 2, 1, send_buffer_z1  );
+        #else
+        buffer_length = Load_Particles_Density_Boundary_to_Buffer( 2, 1, send_buffer_z1  );
+        #endif
+      }
+      else if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ){
+        Load_and_Send_Particles_Z1( ireq_n_particles, ireq_particles_transfer );
+        transfer_main_buffer = false;
+        ireq_n_particles ++;
+        ireq_particles_transfer ++;
+      }
+      #endif
+      
+      if ( transfer_main_buffer ){
+        //post non-blocking receive right x communication buffer
+        MPI_Irecv(recv_buffer_z1, buffer_length, MPI_CHREAL, source[5], 5, world, &recv_request[ireq]);
 
-      //non-blocking send right x communication buffer
-      MPI_Isend(send_buffer_z1, z_buffer_length, MPI_CHREAL, dest[5],   4, world, &send_request[1]);
+        //non-blocking send right x communication buffer
+        MPI_Isend(send_buffer_z1, buffer_length, MPI_CHREAL, dest[5],   4, world, &send_request[1]);
+        MPI_Request_free(send_request+1);
 
-      //keep track of how many sends and receives are expected
-      ireq++;
+        //keep track of how many sends and receives are expected
+        ireq++;
+      }
     }
+    // Receive the number of particles transfer for Z
+      #ifdef PARTICLES
+      if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ) Wait_NTransfer_and_Request_Recv_Particles_Transfer_BLOCK( dir, flags );
+      #endif
   }
 
 }
@@ -769,6 +1440,12 @@ void Grid3D::Wait_and_Unload_MPI_Comm_Buffers_SLAB(int *flags)
 
 void Grid3D::Wait_and_Unload_MPI_Comm_Buffers_BLOCK(int dir, int *flags)
 {
+  
+  #ifdef PARTICLES
+  // If we are transfering the particles buffers we dont need to unload the main buffers
+  if ( Particles.TRANSFER_PARTICLES_BOUNDARIES ) return;
+  #endif
+  
   int iwait;
   int index = 0;
   int wait_max=0;
@@ -816,7 +1493,11 @@ void Grid3D::Unload_MPI_Comm_Buffers(int index)
       Unload_MPI_Comm_Buffers_SLAB(index);
       break;
     case BLOCK_DECOMP:
+      #ifdef GPU_MPI
+      Unload_MPI_Comm_DeviceBuffers_BLOCK(index);
+      #else
       Unload_MPI_Comm_Buffers_BLOCK(index);
+      #endif
       break;
   }
 }
@@ -875,195 +1556,546 @@ void Grid3D::Unload_MPI_Comm_Buffers_BLOCK(int index)
   int idx;
   int gidx;
   int offset;
-
-  //unload left x communication buffer
-  if(index==0)
-  {
-    // 1D
-    if (H.ny == 1 && H.nz == 1) {
-      offset = H.n_ghost;
-      for(i=0;i<H.n_ghost;i++) {
-        idx  = i;
-        gidx = i;
-        for (ii=0; ii<H.n_fields; ii++) { 
-          C.density[idx + H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
-        }
-      }
-    }
-    // 2D
-    if (H.ny > 1 && H.nz == 1) {
-      offset = H.n_ghost*(H.ny-2*H.n_ghost);
-      for(i=0;i<H.n_ghost;i++) {
-        for (j=0;j<H.ny-2*H.n_ghost;j++) {
-          idx  = i + (j+H.n_ghost)*H.nx;
-          gidx = i + j*H.n_ghost;
+  
+  if ( H.TRANSFER_HYDRO_BOUNDARIES ){
+    //unload left x communication buffer
+    if(index==0)
+    {
+      // 1D
+      if (H.ny == 1 && H.nz == 1) {
+        offset = H.n_ghost;
+        for(i=0;i<H.n_ghost;i++) {
+          idx  = i;
+          gidx = i;
           for (ii=0; ii<H.n_fields; ii++) { 
-            C.density[idx + ii*H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
+            C.density[idx + H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
           }
         }
       }
-    }
-    // 3D
-    if (H.nz > 1) {
-      offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
-      for(i=0;i<H.n_ghost;i++) {
-        for(j=0;j<H.ny-2*H.n_ghost;j++) {
-          for(k=0;k<H.nz-2*H.n_ghost;k++) {
-            idx  = i + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-            gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
-            for (ii=0; ii<H.n_fields; ii++) {
+      // 2D
+      if (H.ny > 1 && H.nz == 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost);
+        for(i=0;i<H.n_ghost;i++) {
+          for (j=0;j<H.ny-2*H.n_ghost;j++) {
+            idx  = i + (j+H.n_ghost)*H.nx;
+            gidx = i + j*H.n_ghost;
+            for (ii=0; ii<H.n_fields; ii++) { 
               C.density[idx + ii*H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
             }
           }
         }
       }
-    }
-  }
-
-  //unload right x communication buffer
-  if(index==1)
-  {
-    // 1D
-    if (H.ny == 1 && H.nz == 1) {
-      offset = H.n_ghost;
-      for(i=0;i<H.n_ghost;i++) {
-        idx  = i+H.nx-H.n_ghost;
-        gidx = i;
-        for (ii=0; ii<H.n_fields; ii++) {
-          C.density[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+        for(i=0;i<H.n_ghost;i++) {
+          for(j=0;j<H.ny-2*H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+              for (ii=0; ii<H.n_fields; ii++) {
+                C.density[idx + ii*H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
+              }
+            }
+          }
         }
       }
     }
-    // 2D
-    if (H.ny > 1 && H.nz == 1) {
-      offset = H.n_ghost*(H.ny-2*H.n_ghost);
-      for(i=0;i<H.n_ghost;i++) {
-        for (j=0;j<H.ny-2*H.n_ghost;j++) {
-          idx  = i+H.nx-H.n_ghost + (j+H.n_ghost)*H.nx;
-          gidx = i + j*H.n_ghost;
+
+    //unload right x communication buffer
+    if(index==1)
+    {
+      // 1D
+      if (H.ny == 1 && H.nz == 1) {
+        offset = H.n_ghost;
+        for(i=0;i<H.n_ghost;i++) {
+          idx  = i+H.nx-H.n_ghost;
+          gidx = i;
           for (ii=0; ii<H.n_fields; ii++) {
             C.density[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
           }
         }
       }
-    }
-    // 3D
-    if (H.nz > 1) {
-      offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
-      for(i=0;i<H.n_ghost;i++) {
-        for(j=0;j<H.ny-2*H.n_ghost;j++) {
-          for(k=0;k<H.nz-2*H.n_ghost;k++) {
-            idx  = i+H.nx-H.n_ghost + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-            gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+      // 2D
+      if (H.ny > 1 && H.nz == 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost);
+        for(i=0;i<H.n_ghost;i++) {
+          for (j=0;j<H.ny-2*H.n_ghost;j++) {
+            idx  = i+H.nx-H.n_ghost + (j+H.n_ghost)*H.nx;
+            gidx = i + j*H.n_ghost;
             for (ii=0; ii<H.n_fields; ii++) {
               C.density[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
             }
           }
         }
       }
-    }
-  }
-
-
-  //unload left y communication buffer
-  if(index==2)
-  {
-    // 2D
-    if (H.nz == 1) {
-      offset = H.n_ghost*H.nx;
-      for(i=0;i<H.nx;i++) {
-        for (j=0;j<H.n_ghost;j++) {
-          idx  = i + j*H.nx;
-          gidx = i + j*H.nx;
-          for (ii=0; ii<H.n_fields; ii++) {
-            C.density[idx + ii*H.n_cells] = *(recv_buffer_y0 + gidx + ii*offset);
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+        for(i=0;i<H.n_ghost;i++) {
+          for(j=0;j<H.ny-2*H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i+H.nx-H.n_ghost + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+              for (ii=0; ii<H.n_fields; ii++) {
+                C.density[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
+              }
+            }
           }
         }
       }
     }
-    // 3D
-    if (H.nz > 1) {
-      offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
-      for(i=0;i<H.nx;i++) {
-        for(j=0;j<H.n_ghost;j++) {
-          for(k=0;k<H.nz-2*H.n_ghost;k++) {
-            idx  = i + j*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-            gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+
+
+    //unload left y communication buffer
+    if(index==2)
+    {
+      // 2D
+      if (H.nz == 1) {
+        offset = H.n_ghost*H.nx;
+        for(i=0;i<H.nx;i++) {
+          for (j=0;j<H.n_ghost;j++) {
+            idx  = i + j*H.nx;
+            gidx = i + j*H.nx;
             for (ii=0; ii<H.n_fields; ii++) {
               C.density[idx + ii*H.n_cells] = *(recv_buffer_y0 + gidx + ii*offset);
             }
           }
         }
       }
-    }
-  }
-
-  //unload right y communication buffer
-  if(index==3)
-  {
-    // 2D
-    if (H.nz == 1) {
-      offset = H.n_ghost*H.nx;
-      for(i=0;i<H.nx;i++) {
-        for (j=0;j<H.n_ghost;j++) {
-          idx  = i + (j+H.ny-H.n_ghost)*H.nx;
-          gidx = i + j*H.nx;
-          for (ii=0; ii<H.n_fields; ii++) {
-            C.density[idx + ii*H.n_cells] = *(recv_buffer_y1 + gidx + ii*offset);
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+        for(i=0;i<H.nx;i++) {
+          for(j=0;j<H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i + j*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+              for (ii=0; ii<H.n_fields; ii++) {
+                C.density[idx + ii*H.n_cells] = *(recv_buffer_y0 + gidx + ii*offset);
+              }
+            }
           }
         }
       }
     }
-    // 3D
-    if (H.nz > 1) {
-      offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
-      for(i=0;i<H.nx;i++) {
-        for(j=0;j<H.n_ghost;j++) {
-          for(k=0;k<H.nz-2*H.n_ghost;k++) {
-            idx  = i + (j+H.ny-H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
-            gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+
+    //unload right y communication buffer
+    if(index==3)
+    {
+      // 2D
+      if (H.nz == 1) {
+        offset = H.n_ghost*H.nx;
+        for(i=0;i<H.nx;i++) {
+          for (j=0;j<H.n_ghost;j++) {
+            idx  = i + (j+H.ny-H.n_ghost)*H.nx;
+            gidx = i + j*H.nx;
             for (ii=0; ii<H.n_fields; ii++) {
               C.density[idx + ii*H.n_cells] = *(recv_buffer_y1 + gidx + ii*offset);
             }
           }
         }
       }
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+        for(i=0;i<H.nx;i++) {
+          for(j=0;j<H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i + (j+H.ny-H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+              for (ii=0; ii<H.n_fields; ii++) {
+                C.density[idx + ii*H.n_cells] = *(recv_buffer_y1 + gidx + ii*offset);
+              }
+            }
+          }
+        }
+      }
     }
-  }
 
-  //unload left z communication buffer
-  if(index==4)
-  {
-    offset = H.n_ghost*H.nx*H.ny;
-    for(i=0;i<H.nx;i++) {
-      for(j=0;j<H.ny;j++) {
-        for(k=0;k<H.n_ghost;k++) {
-          idx  = i + j*H.nx + k*H.nx*H.ny;
-          gidx = i + j*H.nx + k*H.nx*H.ny;
-          for (ii=0; ii<H.n_fields; ii++) {
-            C.density[idx + ii*H.n_cells] = *(recv_buffer_z0 + gidx + ii*offset);
+    //unload left z communication buffer
+    if(index==4)
+    {
+      offset = H.n_ghost*H.nx*H.ny;
+      for(i=0;i<H.nx;i++) {
+        for(j=0;j<H.ny;j++) {
+          for(k=0;k<H.n_ghost;k++) {
+            idx  = i + j*H.nx + k*H.nx*H.ny;
+            gidx = i + j*H.nx + k*H.nx*H.ny;
+            for (ii=0; ii<H.n_fields; ii++) {
+              C.density[idx + ii*H.n_cells] = *(recv_buffer_z0 + gidx + ii*offset);
+            }
+          }
+        }
+      }
+    }
+
+    //unload right z communication buffer
+    if(index==5)
+    {
+      offset = H.n_ghost*H.nx*H.ny;
+      for(i=0;i<H.nx;i++) {
+        for(j=0;j<H.ny;j++) {
+          for(k=0;k<H.n_ghost;k++) {
+            idx  = i + j*H.nx + (k+H.nz-H.n_ghost)*H.nx*H.ny;
+            gidx = i + j*H.nx + k*H.nx*H.ny;
+            for (ii=0; ii<H.n_fields; ii++) {
+              C.density[idx + ii*H.n_cells] = *(recv_buffer_z1 + gidx + ii*offset);
+            }
           }
         }
       }
     }
   }
+  
+  #ifdef GRAVITY
+  if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+    #ifdef GRAVITY_GPU
+    if ( index == 0 ) Unload_Gravity_Potential_from_Buffer_GPU( 0, 0, recv_buffer_x0, 0  );
+    if ( index == 1 ) Unload_Gravity_Potential_from_Buffer_GPU( 0, 1, recv_buffer_x1, 0  );
+    if ( index == 2 ) Unload_Gravity_Potential_from_Buffer_GPU( 1, 0, recv_buffer_y0, 0  );
+    if ( index == 3 ) Unload_Gravity_Potential_from_Buffer_GPU( 1, 1, recv_buffer_y1, 0  );
+    if ( index == 4 ) Unload_Gravity_Potential_from_Buffer_GPU( 2, 0, recv_buffer_z0, 0  );
+    if ( index == 5 ) Unload_Gravity_Potential_from_Buffer_GPU( 2, 1, recv_buffer_z1, 0  );
+    #else    
+    if ( index == 0 ) Unload_Gravity_Potential_from_Buffer( 0, 0, recv_buffer_x0, 0  );
+    if ( index == 1 ) Unload_Gravity_Potential_from_Buffer( 0, 1, recv_buffer_x1, 0  );
+    if ( index == 2 ) Unload_Gravity_Potential_from_Buffer( 1, 0, recv_buffer_y0, 0  );
+    if ( index == 3 ) Unload_Gravity_Potential_from_Buffer( 1, 1, recv_buffer_y1, 0  );
+    if ( index == 4 ) Unload_Gravity_Potential_from_Buffer( 2, 0, recv_buffer_z0, 0  );
+    if ( index == 5 ) Unload_Gravity_Potential_from_Buffer( 2, 1, recv_buffer_z1, 0  );
+    #endif
+  }
+  #ifdef SOR
+  if ( Grav.Poisson_solver.TRANSFER_POISSON_BOUNDARIES ){
+    if ( index == 0 ) Unload_Poisson_Boundary_From_Buffer( 0, 0, recv_buffer_x0 );
+    if ( index == 1 ) Unload_Poisson_Boundary_From_Buffer( 0, 1, recv_buffer_x1 );
+    if ( index == 2 ) Unload_Poisson_Boundary_From_Buffer( 1, 0, recv_buffer_y0 );
+    if ( index == 3 ) Unload_Poisson_Boundary_From_Buffer( 1, 1, recv_buffer_y1 );
+    if ( index == 4 ) Unload_Poisson_Boundary_From_Buffer( 2, 0, recv_buffer_z0 );
+    if ( index == 5 ) Unload_Poisson_Boundary_From_Buffer( 2, 1, recv_buffer_z1 );
+  }
+  #endif //SOR
+  #endif //GRAVITY
+  
+  #ifdef PARTICLES
+  if (  Particles.TRANSFER_DENSITY_BOUNDARIES ){
+    #ifdef GRAVITY_GPU
+    if ( index == 0 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 0, 0, recv_buffer_x0 );
+    if ( index == 1 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 0, 1, recv_buffer_x1 );
+    if ( index == 2 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 1, 0, recv_buffer_y0 );
+    if ( index == 3 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 1, 1, recv_buffer_y1 );
+    if ( index == 4 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 2, 0, recv_buffer_z0 );
+    if ( index == 5 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 2, 1, recv_buffer_z1 );    
+    #else
+    if ( index == 0 ) Unload_Particles_Density_Boundary_From_Buffer( 0, 0, recv_buffer_x0 );
+    if ( index == 1 ) Unload_Particles_Density_Boundary_From_Buffer( 0, 1, recv_buffer_x1 );
+    if ( index == 2 ) Unload_Particles_Density_Boundary_From_Buffer( 1, 0, recv_buffer_y0 );
+    if ( index == 3 ) Unload_Particles_Density_Boundary_From_Buffer( 1, 1, recv_buffer_y1 );
+    if ( index == 4 ) Unload_Particles_Density_Boundary_From_Buffer( 2, 0, recv_buffer_z0 );
+    if ( index == 5 ) Unload_Particles_Density_Boundary_From_Buffer( 2, 1, recv_buffer_z1 );
+    #endif
+  }
+  #endif
 
-  //unload right z communication buffer
-  if(index==5)
-  {
-    offset = H.n_ghost*H.nx*H.ny;
-    for(i=0;i<H.nx;i++) {
-      for(j=0;j<H.ny;j++) {
-        for(k=0;k<H.n_ghost;k++) {
-          idx  = i + j*H.nx + (k+H.nz-H.n_ghost)*H.nx*H.ny;
-          gidx = i + j*H.nx + k*H.nx*H.ny;
+}
+
+
+void Grid3D::Unload_MPI_Comm_DeviceBuffers_BLOCK(int index)
+{
+  int i, j, k, ii;
+  int idx;
+  int gidx;
+  int offset;
+  Real *c_head;
+  
+  int n_ghost, nx, ny, nz, n_fields, n_cells;
+  n_ghost = H.n_ghost;
+  nx = H.nx;
+  ny = H.ny;
+  nz = H.nz;
+  n_fields = H.n_fields;
+  n_cells = H.n_cells;
+  
+  
+  c_head = (Real *) C.device;
+  
+  if ( H.TRANSFER_HYDRO_BOUNDARIES ){
+    //unload left x communication buffer
+    if(index==0)
+    {
+      // 1D
+      if (H.ny == 1 && H.nz == 1) {
+        offset = H.n_ghost;
+        #pragma omp target teams distribute parallel for \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_x0, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.n_ghost;i++) {
+          idx  = i;
+          gidx = i;
+          for (ii=0; ii<H.n_fields; ii++) { 
+            c_head[idx + H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
+            //-- FIXME: Shouldn't it be: c_head[idx + ii*H.n_cells] = ...
+          }
+        }
+      }
+      // 2D
+      if (H.ny > 1 && H.nz == 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost);
+        #pragma omp target teams distribute parallel for collapse ( 2 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_x0, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.n_ghost;i++) {
+          for (j=0;j<H.ny-2*H.n_ghost;j++) {
+            idx  = i + (j+H.n_ghost)*H.nx;
+            gidx = i + j*H.n_ghost;
+            for (ii=0; ii<H.n_fields; ii++) { 
+              c_head[idx + ii*H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
+            }
+          }
+        }
+      }
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+        #pragma omp target teams distribute parallel for collapse ( 3 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_x0, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.n_ghost;i++) {
+          for(j=0;j<H.ny-2*H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+              for (ii=0; ii<H.n_fields; ii++) {
+                c_head[idx + ii*H.n_cells] = *(recv_buffer_x0 + gidx + ii*offset);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    //unload right x communication buffer
+    if(index==1)
+    {
+  
+      // 1D
+      if (H.ny == 1 && H.nz == 1) {
+        offset = H.n_ghost;
+        #pragma omp target teams distribute parallel for \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_x1, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.n_ghost;i++) {
+          idx  = i+H.nx-H.n_ghost;
+          gidx = i;
           for (ii=0; ii<H.n_fields; ii++) {
-            C.density[idx + ii*H.n_cells] = *(recv_buffer_z1 + gidx + ii*offset);
+            c_head[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
+          }
+        }
+      }
+      // 2D
+      if (H.ny > 1 && H.nz == 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost);
+        #pragma omp target teams distribute parallel for collapse ( 2 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_x1, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.n_ghost;i++) {
+          for (j=0;j<H.ny-2*H.n_ghost;j++) {
+            idx  = i+H.nx-H.n_ghost + (j+H.n_ghost)*H.nx;
+            gidx = i + j*H.n_ghost;
+            for (ii=0; ii<H.n_fields; ii++) {
+              c_head[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
+            }
+          }
+        }
+      }
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*(H.ny-2*H.n_ghost)*(H.nz-2*H.n_ghost);
+        #pragma omp target teams distribute parallel for collapse ( 3 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_x1, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.n_ghost;i++) {
+          for(j=0;j<H.ny-2*H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i+H.nx-H.n_ghost + (j+H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.n_ghost + k*H.n_ghost*(H.ny-2*H.n_ghost);
+              for (ii=0; ii<H.n_fields; ii++) {
+                c_head[idx + ii*H.n_cells] = *(recv_buffer_x1 + gidx + ii*offset);
+                
+              }
+            }
+          }
+        }
+      }
+    }
+
+
+    //unload left y communication buffer
+    if(index==2)
+    {
+      // 2D
+      if (H.nz == 1) {
+        offset = H.n_ghost*H.nx;
+        #pragma omp target teams distribute parallel for collapse ( 2 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_y0, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.nx;i++) {
+          for (j=0;j<H.n_ghost;j++) {
+            idx  = i + j*H.nx;
+            gidx = i + j*H.nx;
+            for (ii=0; ii<H.n_fields; ii++) {
+              c_head[idx + ii*H.n_cells] = *(recv_buffer_y0 + gidx + ii*offset);
+            }
+          }
+        }
+      }
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+        #pragma omp target teams distribute parallel for collapse ( 3 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_y0, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.nx;i++) {
+          for(j=0;j<H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i + j*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+              for (ii=0; ii<H.n_fields; ii++) {
+                c_head[idx + ii*H.n_cells] = *(recv_buffer_y0 + gidx + ii*offset);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    //unload right y communication buffer
+    if(index==3)
+    {
+      // 2D
+      if (H.nz == 1) {
+        offset = H.n_ghost*H.nx;
+        #pragma omp target teams distribute parallel for collapse ( 2 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_y1, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.nx;i++) {
+          for (j=0;j<H.n_ghost;j++) {
+            idx  = i + (j+H.ny-H.n_ghost)*H.nx;
+            gidx = i + j*H.nx;
+            for (ii=0; ii<H.n_fields; ii++) {
+              c_head[idx + ii*H.n_cells] = *(recv_buffer_y1 + gidx + ii*offset);
+            }
+          }
+        }
+      }
+      // 3D
+      if (H.nz > 1) {
+        offset = H.n_ghost*H.nx*(H.nz-2*H.n_ghost);
+        #pragma omp target teams distribute parallel for collapse ( 3 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_y1, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+        for(i=0;i<H.nx;i++) {
+          for(j=0;j<H.n_ghost;j++) {
+            for(k=0;k<H.nz-2*H.n_ghost;k++) {
+              idx  = i + (j+H.ny-H.n_ghost)*H.nx + (k+H.n_ghost)*H.nx*H.ny;
+              gidx = i + j*H.nx + k*H.nx*H.n_ghost;
+              for (ii=0; ii<H.n_fields; ii++) {
+                c_head[idx + ii*H.n_cells] = *(recv_buffer_y1 + gidx + ii*offset);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    //unload left z communication buffer
+    if(index==4)
+    {
+      offset = H.n_ghost*H.nx*H.ny;
+      #pragma omp target teams distribute parallel for collapse ( 3 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_z0, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells )
+      for(i=0;i<H.nx;i++) {
+        for(j=0;j<H.ny;j++) {
+          for(k=0;k<H.n_ghost;k++) {
+            idx  = i + j*H.nx + k*H.nx*H.ny;
+            gidx = i + j*H.nx + k*H.nx*H.ny;
+            for (ii=0; ii<H.n_fields; ii++) {
+              c_head[idx + ii*H.n_cells] = *(recv_buffer_z0 + gidx + ii*offset);
+            }
+          }
+        }
+      }
+    }
+
+    //unload right z communication buffer
+    if(index==5)
+    {
+      offset = H.n_ghost*H.nx*H.ny;
+      #pragma omp target teams distribute parallel for collapse ( 3 ) \
+                  private ( idx, gidx, ii ) \
+                  firstprivate ( offset ) \
+                  is_device_ptr ( recv_buffer_z1, c_head ) \
+                  map ( to: n_ghost, nx, ny, nz, n_fields, n_cells)
+      for(i=0;i<H.nx;i++) {
+        for(j=0;j<H.ny;j++) {
+          for(k=0;k<H.n_ghost;k++) {
+            idx  = i + j*H.nx + (k+H.nz-H.n_ghost)*H.nx*H.ny;
+            gidx = i + j*H.nx + k*H.nx*H.ny;
+            for (ii=0; ii<H.n_fields; ii++) {
+              c_head[idx + ii*H.n_cells] = *(recv_buffer_z1 + gidx + ii*offset);
+            }
           }
         }
       }
     }
   }
+  
+  #if( defined(GRAVITY) && defined(GRAVITY_GPU)  )
+  if ( Grav.TRANSFER_POTENTIAL_BOUNDARIES ){
+    if ( index == 0 ) Unload_Gravity_Potential_from_Buffer_GPU( 0, 0, recv_buffer_x0, 0  );
+    if ( index == 1 ) Unload_Gravity_Potential_from_Buffer_GPU( 0, 1, recv_buffer_x1, 0  );
+    if ( index == 2 ) Unload_Gravity_Potential_from_Buffer_GPU( 1, 0, recv_buffer_y0, 0  );
+    if ( index == 3 ) Unload_Gravity_Potential_from_Buffer_GPU( 1, 1, recv_buffer_y1, 0  );
+    if ( index == 4 ) Unload_Gravity_Potential_from_Buffer_GPU( 2, 0, recv_buffer_z0, 0  );
+    if ( index == 5 ) Unload_Gravity_Potential_from_Buffer_GPU( 2, 1, recv_buffer_z1, 0  );
+  }
+  #endif//GRAVITY_GPU
+  
+  #if defined(PARTICLES) && defined(GRAVITY_GPU)
+  if (  Particles.TRANSFER_DENSITY_BOUNDARIES ){
+    if ( index == 0 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 0, 0, recv_buffer_x0 );
+    if ( index == 1 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 0, 1, recv_buffer_x1 );
+    if ( index == 2 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 1, 0, recv_buffer_y0 );
+    if ( index == 3 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 1, 1, recv_buffer_y1 );
+    if ( index == 4 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 2, 0, recv_buffer_z0 );
+    if ( index == 5 ) Unload_Particles_Density_Boundary_From_Buffer_GPU( 2, 1, recv_buffer_z1 );
+  }
+  
+  #endif//DPARTICLES_GPU
 
 }
 

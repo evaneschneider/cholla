@@ -17,8 +17,6 @@
 #include "cluster.h"
 #endif
 
-#define OUTPUT
-//#define CPU_TIME
 
 int main(int argc, char *argv[])
 {
@@ -68,30 +66,84 @@ int main(int argc, char *argv[])
   // and output to screen
   chprintf ("Parameter values:  nx = %d, ny = %d, nz = %d, tout = %f, init = %s, boundaries = %d %d %d %d %d %d\n", 
     P.nx, P.ny, P.nz, P.tout, P.init, P.xl_bcnd, P.xu_bcnd, P.yl_bcnd, P.yu_bcnd, P.zl_bcnd, P.zu_bcnd);
+  if (strcmp(P.init, "Read_Grid") == 0  ) chprintf ("Input directory:  %s\n", P.indir);
   chprintf ("Output directory:  %s\n", P.outdir);
-
+  
+  //Create a Log file to output run-time messages
+  Create_Log_File(P);
 
   // initialize the grid
   G.Initialize(&P);
   chprintf("Local number of grid cells: %d %d %d %d\n", G.H.nx_real, G.H.ny_real, G.H.nz_real, G.H.n_cells);
 
-
+  char *message = (char*)malloc(50 * sizeof(char));
+  sprintf(message, "Initializing Simulation" );
+  Write_Message_To_Log_File( message );
+  
   // Set initial conditions and calculate first dt
   chprintf("Setting initial conditions...\n");
   G.Set_Initial_Conditions(P);
   chprintf("Initial conditions set.\n");
-  // set main variables for Read_Grid inital conditions
+  // set main variables for Read_Grid initial conditions
   if (strcmp(P.init, "Read_Grid") == 0) {
     dti = C_cfl / G.H.dt / 0.0001;
     G.H.dt = G.H.dt*0.01;
     outtime += G.H.t;
     t_SN_next = G.H.t;
+    nfile = P.nfile;
   }
+  
+  #ifdef DE
+  chprintf("\nUsing Dual Energy Formalism:\n eta_1: %0.3f   eta_2: %0.4f\n", DE_ETA_1, DE_ETA_2 );
+  sprintf(message, " eta_1: %0.3f   eta_2: %0.3f  ", DE_ETA_1, DE_ETA_2 );
+  Write_Message_To_Log_File( message );
+  #endif
+  
+  
+  #ifdef CPU_TIME
+  G.Timer.Initialize();
+  #endif
+  
+  #ifdef GRAVITY
+  G.Initialize_Gravity(&P);
+  #endif
+  
+  #ifdef PARTICLES
+  G.Initialize_Particles(&P);
+  #endif
 
-  // set boundary conditions (assign appropriate values to ghost cells)
+  #ifdef COSMOLOGY
+  G.Initialize_Cosmology(&P);
+  #endif
+  
+  #ifdef COOLING_GRACKLE
+  G.Initialize_Grackle(&P);
+  #endif
+  
+  #ifdef ANALYSIS
+  G.Initialize_Analysis_Module(&P);
+  if ( G.Analysis.Output_Now ) G.Compute_and_Output_Analysis(&P);
+  #endif
+
+  #ifdef GRAVITY
+  // Get the gravitaional potential for the first timestep
+  G.Compute_Gravitational_Potential( &P);
+  #endif
+
+  // Set boundary conditions (assign appropriate values to ghost cells) for hydro and potential
   chprintf("Setting boundary conditions...\n");
-  G.Set_Boundary_Conditions(P);
+  G.Set_Boundary_Conditions_Grid(P);
   chprintf("Boundary conditions set.\n");  
+
+  #ifdef GRAVITY_ANALYTIC_COMP
+  // add analytic component to gravity potential.
+  G.Add_Analytic_Potential(&P); 
+  #endif 
+  
+  #ifdef PARTICLES
+  // Get the particles acceleration for the first timestep
+  G.Get_Particles_Acceleration();
+  #endif
 
   chprintf("Dimensions of each cell: dx = %f dy = %f dz = %f\n", G.H.dx, G.H.dy, G.H.dz);
   chprintf("Ratio of specific heats gamma = %f\n",gama);
@@ -99,10 +151,14 @@ int main(int argc, char *argv[])
 
 
   #ifdef OUTPUT
-  if (strcmp(P.init, "Read_Grid") != 0) {
-  // write the initial conditions to file
-  chprintf("Writing initial conditions to file...\n");
-  WriteData(G, P);
+  if (strcmp(P.init, "Read_Grid") != 0 || G.H.Output_Now ) {
+    // write the initial conditions to file
+    chprintf("Writing initial conditions to file...\n");
+    #ifdef GPU_MPI
+    cudaMemcpy(G.C.density, G.C.device, 
+             G.H.n_fields*G.H.n_cells*sizeof(Real), cudaMemcpyDeviceToHost);
+    #endif
+    WriteData(G, P, nfile);
   }
   #endif //OUTPUT
   // increment the next output time
@@ -131,21 +187,20 @@ int main(int argc, char *argv[])
 
   // Evolve the grid, one timestep at a time
   chprintf("Starting calculations.\n");
+  sprintf(message, "Starting calculations." );
+  Write_Message_To_Log_File( message );
   while (G.H.t < P.tout)
-  //while (G.H.n_step < 1)
   {
-
     // get the start time
     start_step = get_time();
     
     // calculate the timestep
     G.set_dt(dti);
 
-    if (G.H.t + G.H.dt > outtime) 
-    {
-      G.H.dt = outtime - G.H.t;
-    }
-    
+
+    if (G.H.t + G.H.dt > outtime) G.H.dt = outtime - G.H.t;
+
+    #ifdef CLUSTERS
     // turn on/off clusters based on cumulative star formation
     if (G.H.t >= t_SN_next) {
       for (int nn=0; nn<N_CL; nn++) {
@@ -170,55 +225,50 @@ int main(int argc, char *argv[])
     if (dt_old > G.H.dt) {
       sn_dti = G.Add_Clusters(Clusters, dt_old);
     }
+    #endif
    
-
+    #ifdef PARTICLES
+    //Advance the particles KDK( first step ): Velocities are updated by 0.5*dt and positions are updated by dt
+    G.Advance_Particles( 1 );   
+    //Transfer the particles that moved outside the local domain  
+    G.Transfer_Particles_Boundaries(P); 
+    #endif
+    
     // Advance the grid by one timestep
-    #ifdef CPU_TIME
-    start_hydro = get_time();
-    #endif //CPU_TIME
-    dti = G.Update_Grid();
-    #ifdef CPU_TIME
-    stop_hydro = get_time();
-    hydro = stop_hydro - start_hydro;
-    #ifdef MPI_CHOLLA
-    hydro_min = ReduceRealMin(hydro);
-    hydro_max = ReduceRealMax(hydro);
-    hydro_avg = ReduceRealAvg(hydro);
-    #endif //MPI_CHOLLA
-    #endif //CPU_TIME
-    //printf("%d After Grid Update: %f %f\n", procID, G.H.dt, dti);
+    dti = G.Update_Hydro_Grid();
 
-    // Fix bad cells
-    G.Fix_Cells();
-
-    // update the time
-    G.H.t += G.H.dt;
+    // update the simulation time ( t += dt )
+    G.Update_Time();
+    
+        
+    #ifdef GRAVITY
+    //Compute Gravitational potential for next step
+    G.Compute_Gravitational_Potential( &P);
+    #endif
 
     // add one to the timestep count
     G.H.n_step++;
 
-    // set boundary conditions for next time step 
-    #ifdef CPU_TIME
-    start_bound = get_time();
-    #endif //CPU_TIME
-    G.Set_Boundary_Conditions(P);
-    #ifdef CPU_TIME
-    stop_bound = get_time();
-    bound = stop_bound - start_bound;
-    #ifdef MPI_CHOLLA
-    bound_min = ReduceRealMin(bound);
-    bound_max = ReduceRealMax(bound);
-    bound_avg = ReduceRealAvg(bound);
-    #endif //MPI_CHOLLA
-    #endif //CPU_TIME
+    //Set the Grid boundary conditions for next time step 
+    G.Set_Boundary_Conditions_Grid(P);
+    
+    #ifdef GRAVITY_ANALYTIC_COMP
+    // add analytic component to gravity potential.
+    G.Add_Analytic_Potential(&P); 
+    #endif 
+
+    #ifdef PARTICLES
+    ///Advance the particles KDK( second step ): Velocities are updated by 0.5*dt using the Accelerations at the new positions
+    G.Advance_Particles( 2 );
+    #endif
+    
+    #ifdef PARTICLE_AGE
+    //G.Cluster_Feedback();
+    #endif
 
     #ifdef CPU_TIME
-    #ifdef MPI_CHOLLA
-    chprintf("hydro min: %9.4f  max: %9.4f  avg: %9.4f\n", hydro_min, hydro_max, hydro_avg);
-    chprintf("bound min: %9.4f  max: %9.4f  avg: %9.4f\n", bound_min, bound_max, bound_avg);
-    #endif //MPI_CHOLLA
-    #endif //CPU_TIME
-
+    G.Timer.Print_Times();
+    #endif
 
     // get the time to compute the total timestep
     stop_step = get_time();
@@ -227,39 +277,70 @@ int main(int argc, char *argv[])
     #ifdef MPI_CHOLLA
     G.H.t_wall = ReduceRealMax(G.H.t_wall);
     #endif 
-    chprintf("n_step: %d   sim time: %10.7f   sim timestep: %7.4e  timestep time = %9.3f ms   total time = %9.4f s\n", 
+    chprintf("n_step: %d   sim time: %10.7f   sim timestep: %7.4e  timestep time = %9.3f ms   total time = %9.4f s\n\n", 
       G.H.n_step, G.H.t, G.H.dt, (stop_step-start_step)*1000, G.H.t_wall);
-
-    if (G.H.t == outtime)
+    
+    #ifdef OUTPUT_ALWAYS
+    G.H.Output_Now = true;
+    #endif
+    
+    #ifdef ANALYSIS
+    if ( G.Analysis.Output_Now ) G.Compute_and_Output_Analysis(&P);
+    #endif
+    
+    // if ( P.n_steps_output > 0 && G.H.n_step % P.n_steps_output == 0) G.H.Output_Now = true;
+    
+    if (G.H.t == outtime || G.H.Output_Now )
     {
       #ifdef OUTPUT
       /*output the grid data*/
-      WriteData(G, P);
+      #ifdef GPU_MPI
+      cudaMemcpy(G.C.density, G.C.device, 
+                 G.H.n_fields*G.H.n_cells*sizeof(Real), cudaMemcpyDeviceToHost);
+      #endif
+      WriteData(G, P, nfile);
       // add one to the output file count
       #endif //OUTPUT
       // update to the next output time
       outtime += G.H.out_step;      
     }
-/*
-    // check for failures
-    for (int i=G.H.n_ghost; i<G.H.nx-G.H.n_ghost; i++) {
-      for (int j=G.H.n_ghost; j<G.H.ny-G.H.n_ghost; j++) {
-        for (int k=G.H.n_ghost; k<G.H.nz-G.H.n_ghost; k++) {
-          int id = i + j*G.H.nx + k*G.H.nx*G.H.ny;
-          if (G.C.density[id] < 0.0 || G.C.density[id] != G.C.density[id]) {
-            printf("Failure in cell %d %d %d. Density %e\n", i, j, k, G.C.density[id]);
-            #ifdef MPI_CHOLLA
-            MPI_Finalize();
-            chexit(-1);
-            #endif
-            exit(0);
-          }
-        }
-      }
+        
+    #ifdef CPU_TIME
+    G.Timer.n_steps += 1;
+    #endif
+    
+    #ifdef N_STEPS_LIMIT
+    // Exit the loop when reached the limit number of steps (optional)
+    if ( G.H.n_step == N_STEPS_LIMIT) {
+      #ifdef GPU_MPI
+      cudaMemcpy(G.C.density, G.C.device, 
+                 G.H.n_fields*G.H.n_cells*sizeof(Real), cudaMemcpyDeviceToHost);
+      #endif
+      WriteData(G, P, nfile);
+      break;
     }
-*/   
+    #endif
+    
+    
+    #ifdef COSMOLOGY
+    // Exit the loop when reached the last scale_factor output 
+    if ( G.Cosmo.exit_now ) {
+      chprintf( "\nReached Last Cosmological Output: Ending Simulation\n");
+      break;
+    }
+    #endif
 
   } /*end loop over timesteps*/
+  
+  
+  #ifdef CPU_TIME
+  // Print timing statistics
+  G.Timer.Get_Average_Times();
+  G.Timer.Print_Average_Times( P );
+  #endif
+  
+  sprintf(message, "Simulation completed successfully." );
+  Write_Message_To_Log_File( message );
 
   // free the grid
   G.Reset();
