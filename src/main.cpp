@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
     // turn on/off clusters based on cumulative star formation
     if (G.H.t >= t_SN_next) {
       for (int nn=0; nn<N_CL; nn++) {
-        Clusters[cc].Switch(G.H.t);
+        Clusters[nn].Switch(G.H.t);
       }
       t_SN_next += dt_SN;
     }

@@ -48,7 +48,7 @@ typedef double Real;
 #define LOG_FILE_NAME "run_output.log"
 
 //Conserved Floor Values
-#define TEMP_FLOOR 1e-3
+#define TEMP_FLOOR 1e4
 #define DENS_FLOOR 1e-5
 
 //Parameter for Enzo dual Energy Condition

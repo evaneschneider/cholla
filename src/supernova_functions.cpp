@@ -191,6 +191,11 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
     // is the cluster on?
     if (Clusters[nn].flag_on) {
 
+      // get M_dot and E_dot
+      Clusters[nn].Get_S99_Fluxes();
+      rho_dot = Clusters[nn].M_dot / V;
+      Ed_dot = Clusters[nn].E_dot / V;
+
       // get the variables for the cluster location
       x_cl = Clusters[nn].x_pos;
       y_cl = Clusters[nn].y_pos;
@@ -236,11 +241,6 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
 
           }
 */
-          // get M_dot and E_dot
-          Clusters[nn].Get_S99_Fluxes();
-          rho_dot = Clusters[nn].M_dot / V;
-          Ed_dot = Clusters[nn].E_dot / V;
-          
 
           //printf("procID: %d  ig: %d  jg: %d  kg: %d  il: %d  jl: %d  kl: %d\n", procID, ii, jj, kk, i, j, k);
 
@@ -281,6 +281,8 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
               #ifdef SCALAR
               C.scalar[id] += 1.0*rho_dot*H.dt;
               #endif
+              //M_dot_tot += rho_dot*H.dx*H.dy*H.dz;
+              //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz;
             }
           }
           // on the sphere
@@ -321,9 +323,9 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
               #ifdef SCALAR
               C.scalar[id] += 1.0*weight*rho_dot*H.dt;
               #endif
+              //M_dot_tot += rho_dot*H.dx*H.dy*H.dz*weight;
+              //E_dot_tot += Ed_dot*H.dx*H.dy*H.dz*weight;
             }
-            //M_dot_tot += rho_dot[nn]*H.dx*H.dy*H.dz;
-            //E_dot_tot += Ed_dot[nn]*H.dx*H.dy*H.dz;
           }
           // recalculate the timestep for these cells
           d_inv = 1.0 / C.density[id];
@@ -357,6 +359,7 @@ Real Grid3D::Add_Clusters(Cluster Clusters[], Real dt_old)
   chprintf("Total M_dot: %e E_dot: %e \n", global_M_dot, global_E_dot*MASS_UNIT*VELOCITY_UNIT*VELOCITY_UNIT); 
   fflush(stdout);
   */
+  
 
   // compute max inverse of dt
   max_dti = max_vx / H.dx;
