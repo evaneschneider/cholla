@@ -118,7 +118,7 @@ void Grid3D::Initialize(struct parameters *P)
   int nz_in = P->nz;
 
   // Set the CFL coefficient (a global variable)
-  C_cfl = 0.3;
+  C_cfl = 0.2;
 
 #ifndef MPI_CHOLLA
 
@@ -733,6 +733,132 @@ void Grid3D::Update_Time(){
   
   
 }
+
+
+void Grid3D::Fix_Cells(void)
+{
+  int i, j, k, id;
+  Real d, mx, my, mz, P, E;
+  Real n, T, mu;
+  Real c;
+  mu = 0.6;
+
+  for (k=H.n_ghost; k<H.nz-H.n_ghost; k++) {
+    for (j=H.n_ghost; j<H.ny-H.n_ghost; j++) {
+      for (i=H.n_ghost; i<H.nx-H.n_ghost; i++) {
+
+        id = i + j*H.nx + k*H.nx*H.ny;
+
+        d = C.density[id];
+        E = C.Energy[id];
+        mx = C.momentum_x[id];
+        my = C.momentum_y[id];
+        mz = C.momentum_z[id];
+        P = (E - (0.5/d)*(mx*mx+ my*my+ mz*mz))*(gama-1.0);
+        n = d*DENSITY_UNIT/(mu*MP);
+        #ifdef DE
+        T = C.GasEnergy[id]*(gama-1.0)*PRESSURE_UNIT/(n*KB); 
+        #else
+        T = P*PRESSURE_UNIT/(n*KB);
+        #endif
+        c = C.scalar[id]/d;
+
+        // if there is a problem, replace the cell value with surrounding cell average
+        if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e9) {
+        //if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E || T > 1.0e10) {
+
+          printf("%3d %3d %3d BC: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
+
+          int idn;
+          int N = 0;
+          int S = 0;
+          Real d_av, vx_av, vy_av, vz_av, P_av;
+          d_av = vx_av = vy_av = vz_av = P_av = 0.0;
+          #ifdef SCALAR
+          Real scalar[NSCALARS], scalar_av[NSCALARS];
+          for (int n=0; n<NSCALARS; n++) {
+            scalar_av[n] = 0.0;
+          }
+          #endif
+
+          for (int kk=k-1; kk<=k+1; kk++) {
+          for (int jj=j-1; jj<=j+1; jj++) {
+          for (int ii=i-1; ii<=i+1; ii++) {
+
+            idn = ii + jj*H.nx + kk*H.nx*H.ny; 
+            d = C.density[idn];
+            mx = C.momentum_x[idn];
+            my = C.momentum_y[idn];
+            mz = C.momentum_z[idn];
+            P  = (C.Energy[idn] - (0.5/d)*(mx*mx + my*my + mz*mz))*(gama-1.0);
+            #ifdef SCALAR
+            for (int n = 0; n<NSCALARS; n++) {
+              scalar[n]  = C.scalar[idn+n*H.n_cells];
+            }
+            #endif
+            if (d > 0.0 && P > 0.0) {
+              d_av += d;
+              vx_av += mx;
+              vy_av += my;
+              vz_av += mz;
+              P_av += P/(gama-1.0);
+              #ifdef SCALAR
+              for (int n=0; n<NSCALARS; n++) {
+                scalar_av[n] += scalar[n];
+              }
+              #endif
+              N++;
+            }
+
+          }
+          }
+          }
+
+          P_av = P_av / N;
+          vx_av = vx_av/d_av;
+          vy_av = vy_av/d_av;
+          vz_av = vz_av/d_av;
+          #ifdef SCALAR
+          for (int n=0; n<NSCALARS; n++) {
+            scalar_av[n] = scalar_av[n]/d_av;
+          }
+          #endif
+          d_av = d_av/N;
+
+          // replace cell values with new averaged values
+          C.density[id] = d_av;
+          C.momentum_x[id] = d_av*vx_av;
+          C.momentum_y[id] = d_av*vy_av;
+          C.momentum_z[id] = d_av*vz_av;
+          C.Energy[id] = P_av/(gama-1.0) + 0.5*d_av*(vx_av*vx_av + vy_av*vy_av + vz_av*vz_av);
+          #ifdef DE
+          C.GasEnergy[id] = P_av/(gama-1.0);
+          #endif
+          #ifdef SCALAR
+          for (int n=0; n<NSCALARS; n++) {
+            C.scalar[id+n*H.n_cells] = d_av*scalar_av[n];
+          }
+          #endif
+
+          d = d_av;
+          E = P_av/(gama-1.0) + 0.5*d_av*(vx_av*vx_av + vy_av*vy_av + vz_av*vz_av);
+          P = P_av;
+          n = d*DENSITY_UNIT/(mu*MP);
+          T = P_av*PRESSURE_UNIT/(n*KB);
+          c = scalar_av[0];
+
+          printf("%3d %3d %3d FC: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
+          if (d < 0.0 || d != d || P < 0.0 || P != P|| E < 0.0 || E != E|| T > 1.0e9) {
+            printf("%3d %3d %3d Flux correction failed: d: %e  E:%e  P:%e  n:%e  T:%e  c:%e\n", i+nx_local_start, j+ny_local_start, k+nz_local_start, d, E, P, n, T, c);
+          }
+
+        }
+      }
+    }
+  }
+
+}
+
 
 
 /*! \fn void Reset(void)

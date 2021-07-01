@@ -239,6 +239,10 @@ int main(int argc, char *argv[])
     // Advance the grid by one timestep
     dti = G.Update_Hydro_Grid();
 
+
+    // Fix bad cells
+    G.Fix_Cells();
+
     // update the simulation time ( t += dt )
     G.Update_Time();
     

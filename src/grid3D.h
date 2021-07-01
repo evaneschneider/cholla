@@ -572,6 +572,7 @@ class Grid3D
     Real Add_Supernova(void);    
     Real Add_Clusters(Cluster Clusters[], Real dt_old);    
     Real Add_Supernovae_CC85(void);
+    void Fix_Cells(void);
     void Set_Cluster_Locations(void);
     #endif
 
