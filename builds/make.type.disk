@@ -24,6 +24,7 @@ DFLAGS    += -DDENSITY_FLOOR
 DFLAGS    += -DTEMPERATURE_FLOOR
 
 # Average slow cells
+DFLAGS    += -DAVERAGE_SLOW_CELLS
 
 # Solve the Gas Internal Energy usisng a Dual Energy Formalism
 DFLAGS    += -DDE

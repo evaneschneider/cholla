@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
       if (C_cfl/sn_dti < G.H.dt) {
         printf("SN timestep is shorter. Need to correct energy input. %e %e\n", C_cfl/sn_dti, G.H.dt);
         fflush(stdout);
-        //G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
+        G.H.dt = fmin(G.H.dt, C_cfl/sn_dti);
       }
     }
     #ifdef MPI_CHOLLA
