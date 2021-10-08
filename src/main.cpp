@@ -184,7 +184,7 @@ int main(int argc, char *argv[])
   Cluster Clusters[N_CL];
   for (int nn=0; nn<N_CL; nn++) {
     Clusters[nn].id = nn;
-    Clusters[nn].Initialize();
+    Clusters[nn].Initialize(G.H.t-5000);
   }
   #endif
 

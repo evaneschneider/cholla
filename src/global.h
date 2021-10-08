@@ -115,7 +115,7 @@ typedef int grav_int_t;
 #endif
 
 #ifdef CLUSTERS
-#define N_CL 18204
+#define N_CL 2443
 #endif
 #ifdef PARTICLES
 #ifdef PARTICLES_LONG_INTS

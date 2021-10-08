@@ -475,16 +475,16 @@ void Grid3D::Write_Header_HDF5(hid_t file_id)
   // Create the data space for the attribute
   dataspace_id = H5Screate_simple(1, &attr_dims, NULL);
   // Create a group attribute
-  attribute_id = H5Acreate(file_id, "gamma", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  attribute_id = H5Acreate(file_id, "gamma", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
   // Write the attribute data
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &gama);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &gama);
   // Close the attribute
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "t", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &H.t);
+  attribute_id = H5Acreate(file_id, "t", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &H.t);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "dt", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &H.dt);
+  attribute_id = H5Acreate(file_id, "dt", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &H.dt);
   status = H5Aclose(attribute_id);
   attribute_id = H5Acreate(file_id, "n_step", H5T_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
   status = H5Awrite(attribute_id, H5T_NATIVE_INT, &H.n_step);
@@ -493,45 +493,45 @@ void Grid3D::Write_Header_HDF5(hid_t file_id)
   status = H5Awrite(attribute_id, H5T_NATIVE_INT, &H.n_fields);
   status = H5Aclose(attribute_id);
   double time_unit = TIME_UNIT;
-  attribute_id = H5Acreate(file_id, "time_unit", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &time_unit);
+  attribute_id = H5Acreate(file_id, "time_unit", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &time_unit);
   status = H5Aclose(attribute_id);
   double length_unit = LENGTH_UNIT;
-  attribute_id = H5Acreate(file_id, "length_unit", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &length_unit);
+  attribute_id = H5Acreate(file_id, "length_unit", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &length_unit);
   status = H5Aclose(attribute_id);
   double mass_unit = MASS_UNIT;
-  attribute_id = H5Acreate(file_id, "mass_unit", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &mass_unit);
+  attribute_id = H5Acreate(file_id, "mass_unit", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &mass_unit);
   status = H5Aclose(attribute_id);
   double velocity_unit = VELOCITY_UNIT;
-  attribute_id = H5Acreate(file_id, "velocity_unit", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &velocity_unit);
+  attribute_id = H5Acreate(file_id, "velocity_unit", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &velocity_unit);
   status = H5Aclose(attribute_id);
   double density_unit = DENSITY_UNIT;
-  attribute_id = H5Acreate(file_id, "density_unit", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &density_unit);
+  attribute_id = H5Acreate(file_id, "density_unit", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &density_unit);
   status = H5Aclose(attribute_id);
   double energy_unit = ENERGY_UNIT;
-  attribute_id = H5Acreate(file_id, "energy_unit", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &energy_unit);
+  attribute_id = H5Acreate(file_id, "energy_unit", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &energy_unit);
   status = H5Aclose(attribute_id);
   
   #ifdef COSMOLOGY
-  attribute_id = H5Acreate(file_id, "H0", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &Cosmo.H0);
+  attribute_id = H5Acreate(file_id, "H0", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &Cosmo.H0);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "Omega_M", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &Cosmo.Omega_M);
+  attribute_id = H5Acreate(file_id, "Omega_M", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &Cosmo.Omega_M);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "Omega_L", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &Cosmo.Omega_L);
+  attribute_id = H5Acreate(file_id, "Omega_L", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &Cosmo.Omega_L);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "Current_z", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &Cosmo.current_z);
+  attribute_id = H5Acreate(file_id, "Current_z", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &Cosmo.current_z);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "Current_a", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &Cosmo.current_a);
+  attribute_id = H5Acreate(file_id, "Current_a", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &Cosmo.current_a);
   status = H5Aclose(attribute_id);
   #endif
   
@@ -588,24 +588,24 @@ void Grid3D::Write_Header_HDF5(hid_t file_id)
   Real_data[1] = H.ybound;
   Real_data[2] = H.zbound;
 
-  attribute_id = H5Acreate(file_id, "bounds", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, Real_data);
+  attribute_id = H5Acreate(file_id, "bounds", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, Real_data);
   status = H5Aclose(attribute_id);
 
   Real_data[0] = H.xdglobal;
   Real_data[1] = H.ydglobal;
   Real_data[2] = H.zdglobal;
 
-  attribute_id = H5Acreate(file_id, "domain", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, Real_data);
+  attribute_id = H5Acreate(file_id, "domain", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, Real_data);
   status = H5Aclose(attribute_id);
 
   Real_data[0] = H.dx;
   Real_data[1] = H.dy;
   Real_data[2] = H.dz;
 
-  attribute_id = H5Acreate(file_id, "dx", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, Real_data);
+  attribute_id = H5Acreate(file_id, "dx", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, Real_data);
   status = H5Aclose(attribute_id);
   
   // Close the dataspace
@@ -667,16 +667,16 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
   // Create the data space for the attribute
   dataspace_id = H5Screate_simple(1, &attr_dims, NULL);
   // Create a group attribute
-  attribute_id = H5Acreate(file_id, "gamma", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  attribute_id = H5Acreate(file_id, "gamma", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
   // Write the attribute data
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &gama);
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &gama);
   // Close the attribute
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "t", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &H.t);
+  attribute_id = H5Acreate(file_id, "t", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &H.t);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "dt", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &H.dt);
+  attribute_id = H5Acreate(file_id, "dt", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &H.dt);
   status = H5Aclose(attribute_id);
   attribute_id = H5Acreate(file_id, "n_step", H5T_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
   status = H5Awrite(attribute_id, H5T_NATIVE_INT, &H.n_step);
@@ -705,22 +705,22 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
   status = H5Awrite(attribute_id, H5T_NATIVE_INT, &R.nz_max);
   status = H5Aclose(attribute_id);
   delta = 180.*R.delta/M_PI;
-  attribute_id = H5Acreate(file_id, "delta", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &delta);
+  attribute_id = H5Acreate(file_id, "delta", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &delta);
   status = H5Aclose(attribute_id);
   theta = 180.*R.theta/M_PI;
-  attribute_id = H5Acreate(file_id, "theta", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &theta);
+  attribute_id = H5Acreate(file_id, "theta", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &theta);
   status = H5Aclose(attribute_id);
   phi = 180.*R.phi/M_PI;
-  attribute_id = H5Acreate(file_id, "phi", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &phi);
+  attribute_id = H5Acreate(file_id, "phi", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &phi);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "Lx", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &R.Lx);
+  attribute_id = H5Acreate(file_id, "Lx", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &R.Lx);
   status = H5Aclose(attribute_id);
-  attribute_id = H5Acreate(file_id, "Lz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &R.Lz);
+  attribute_id = H5Acreate(file_id, "Lz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, &R.Lz);
   status = H5Aclose(attribute_id);
   // Close the dataspace
   status = H5Sclose(dataspace_id);
@@ -767,24 +767,24 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
   Real_data[1] = H.ybound;
   Real_data[2] = H.zbound;
 
-  attribute_id = H5Acreate(file_id, "bounds", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, Real_data);
+  attribute_id = H5Acreate(file_id, "bounds", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, Real_data);
   status = H5Aclose(attribute_id);
 
   Real_data[0] = H.xdglobal;
   Real_data[1] = H.ydglobal;
   Real_data[2] = H.zdglobal;
 
-  attribute_id = H5Acreate(file_id, "domain", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, Real_data);
+  attribute_id = H5Acreate(file_id, "domain", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, Real_data);
   status = H5Aclose(attribute_id);
 
   Real_data[0] = H.dx;
   Real_data[1] = H.dy;
   Real_data[2] = H.dz;
 
-  attribute_id = H5Acreate(file_id, "dx", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
-  status = H5Awrite(attribute_id, H5T_NATIVE_FLOAT, Real_data);
+  attribute_id = H5Acreate(file_id, "dx", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT); 
+  status = H5Awrite(attribute_id, H5T_NATIVE_DOUBLE, Real_data);
   status = H5Aclose(attribute_id);
 
   // Close the dataspace
@@ -1042,9 +1042,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     memcpy(&dataset_buffer[0], &(C.density[id]), H.nx_real*sizeof(Real));    
 
     // Create a dataset id for density
-    dataset_id = H5Dcreate(file_id, "/density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1053,9 +1053,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     memcpy(&dataset_buffer[0], &(C.momentum_x[id]), H.nx_real*sizeof(Real));    
 
     // Create a dataset id for x momentum 
-    dataset_id = H5Dcreate(file_id, "/momentum_x", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/momentum_x", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the x momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1064,9 +1064,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     memcpy(&dataset_buffer[0], &(C.momentum_y[id]), H.nx_real*sizeof(Real));    
 
     // Create a dataset id for y momentum 
-    dataset_id = H5Dcreate(file_id, "/momentum_y", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/momentum_y", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the y momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1075,9 +1075,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     memcpy(&dataset_buffer[0], &(C.momentum_z[id]), H.nx_real*sizeof(Real));    
 
     // Create a dataset id for z momentum 
-    dataset_id = H5Dcreate(file_id, "/momentum_z", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/momentum_z", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the z momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
    
@@ -1086,9 +1086,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     memcpy(&dataset_buffer[0], &(C.Energy[id]), H.nx_real*sizeof(Real));    
 
     // Create a dataset id for Energy 
-    dataset_id = H5Dcreate(file_id, "/Energy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/Energy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the Energy array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1105,9 +1105,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       memcpy(&dataset_buffer[0], &(C.scalar[id+s*H.n_cells]), H.nx_real*sizeof(Real));    
 
       // Create a dataset id for the scalar
-      dataset_id = H5Dcreate(file_id, dataset, H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, dataset, H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the scalar array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1119,9 +1119,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     memcpy(&dataset_buffer[0], &(C.GasEnergy[id]), H.nx_real*sizeof(Real));    
 
     // Create a dataset id for internal energy 
-    dataset_id = H5Dcreate(file_id, "/GasEnergy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/GasEnergy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the internal energy array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
     #endif
@@ -1154,9 +1154,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
 
     // Create a dataset id for density
-    dataset_id = H5Dcreate(file_id, "/density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1169,9 +1169,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     // Create a dataset id for x momentum 
-    dataset_id = H5Dcreate(file_id, "/momentum_x", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/momentum_x", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the x momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1185,9 +1185,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
 
     // Create a dataset id for y momentum 
-    dataset_id = H5Dcreate(file_id, "/momentum_y", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/momentum_y", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the y momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1201,9 +1201,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
 
     // Create a dataset id for z momentum 
-    dataset_id = H5Dcreate(file_id, "/momentum_z", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/momentum_z", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the z momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
    
@@ -1217,9 +1217,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
 
     // Create a dataset id for Energy 
-    dataset_id = H5Dcreate(file_id, "/Energy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/Energy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the Energy array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -1241,9 +1241,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
         }
       }
       // Create a dataset id for the scalar
-      dataset_id = H5Dcreate(file_id, dataset, H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, dataset, H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the scalar array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1261,9 +1261,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
 
     // Create a dataset id for internal energy 
-    dataset_id = H5Dcreate(file_id, "/GasEnergy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/GasEnergy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the internal energy array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
     #endif
@@ -1302,9 +1302,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
 
     // Create a dataset id for density
-    dataset_id = H5Dcreate(file_id, "/density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
     
@@ -1321,9 +1321,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
     if ( output_momentum || H.Output_Complete_Data ){
       // Create a dataset id for x momentum 
-      dataset_id = H5Dcreate(file_id, "/momentum_x", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, "/momentum_x", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the x momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1339,9 +1339,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
     if ( output_momentum || H.Output_Complete_Data ){
       // Create a dataset id for y momentum 
-      dataset_id = H5Dcreate(file_id, "/momentum_y", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, "/momentum_y", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the y momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1358,9 +1358,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
     if ( output_momentum || H.Output_Complete_Data ){
       // Create a dataset id for z momentum 
-      dataset_id = H5Dcreate(file_id, "/momentum_z", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, "/momentum_z", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the z momentum array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1378,9 +1378,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }
     if ( output_energy || H.Output_Complete_Data ){
       // Create a dataset id for Energy 
-      dataset_id = H5Dcreate(file_id, "/Energy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, "/Energy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the Energy array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1405,9 +1405,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
         }
       }
       // Create a dataset id for the scalar
-      dataset_id = H5Dcreate(file_id, dataset, H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, dataset, H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the scalar array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1422,8 +1422,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
         }
       }
     }
-    dataset_id = H5Dcreate(file_id, "/HI_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+    dataset_id = H5Dcreate(file_id, "/HI_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
     status = H5Dclose(dataset_id);
 
     for (k=0; k<H.nz_real; k++) {
@@ -1436,8 +1436,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     if ( output_full_ionization || H.Output_Complete_Data ){
-      dataset_id = H5Dcreate(file_id, "/HII_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      dataset_id = H5Dcreate(file_id, "/HII_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
     }
     
@@ -1451,8 +1451,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     if ( output_full_ionization || H.Output_Complete_Data ){
-      dataset_id = H5Dcreate(file_id, "/HeI_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      dataset_id = H5Dcreate(file_id, "/HeI_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
     }
     for (k=0; k<H.nz_real; k++) {
@@ -1465,8 +1465,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     if ( output_full_ionization || H.Output_Complete_Data ){
-      dataset_id = H5Dcreate(file_id, "/HeII_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      dataset_id = H5Dcreate(file_id, "/HeII_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
     }
     for (k=0; k<H.nz_real; k++) {
@@ -1479,8 +1479,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     if ( output_full_ionization || H.Output_Complete_Data ){
-      dataset_id = H5Dcreate(file_id, "/HeIII_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      dataset_id = H5Dcreate(file_id, "/HeIII_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
     }
     
@@ -1495,8 +1495,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     if ( output_electrons || H.Output_Complete_Data ){
-      dataset_id = H5Dcreate(file_id, "/e_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      dataset_id = H5Dcreate(file_id, "/e_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
     }
     
@@ -1512,8 +1512,8 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     if ( output_metals || H.Output_Complete_Data ){
-      dataset_id = H5Dcreate(file_id, "/metal_density", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      dataset_id = H5Dcreate(file_id, "/metal_density", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
     }
     #endif //GRACKLE_METALS
@@ -1532,9 +1532,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     // Create a dataset id for density
-    dataset_id = H5Dcreate(file_id, "/temperature", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/temperature", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
     // Free the dataset id
     status = H5Dclose(dataset_id);
     #endif //OUTPUT_TEMPERATURE
@@ -1555,9 +1555,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     }    
     if ( output_energy || H.Output_Complete_Data ){
       // Create a dataset id for internal energy 
-      dataset_id = H5Dcreate(file_id, "/GasEnergy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      dataset_id = H5Dcreate(file_id, "/GasEnergy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       // Write the internal energy array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
     }
@@ -1577,9 +1577,9 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
       }
     }
     // Create a dataset id for density
-    dataset_id = H5Dcreate(file_id, "/grav_potential", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/grav_potential", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
     // Free the dataset id
     status = H5Dclose(dataset_id);
     #endif//GRAVITY
@@ -1693,30 +1693,30 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
     
 
     // Create a dataset id for projected xy density
-    dataset_id = H5Dcreate(file_id, "/d_xy", H5T_IEEE_F32LE, dataspace_xy_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/d_xy", H5T_IEEE_F64BE, dataspace_xy_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_dxy); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_dxy); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
     // Create a dataset id for projected xz density
-    dataset_id = H5Dcreate(file_id, "/d_xz", H5T_IEEE_F32LE, dataspace_xz_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/d_xz", H5T_IEEE_F64BE, dataspace_xz_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_dxz); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_dxz); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
     // Create a dataset id for projected xy temperature 
-    dataset_id = H5Dcreate(file_id, "/T_xy", H5T_IEEE_F32LE, dataspace_xy_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/T_xy", H5T_IEEE_F64BE, dataspace_xy_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected temperature array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_Txy); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_Txy); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
     // Create a dataset id for projected xz density
-    dataset_id = H5Dcreate(file_id, "/T_xz", H5T_IEEE_F32LE, dataspace_xz_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/T_xz", H5T_IEEE_F64BE, dataspace_xz_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected temperature array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_Txz); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_Txz); 
     // Free the dataset id
     status = H5Dclose(dataset_id);    
 
@@ -1863,38 +1863,38 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
 
 
     // Create a dataset id for projected xy density
-    dataset_id = H5Dcreate(file_id, "/d_xzr", H5T_IEEE_F32LE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/d_xzr", H5T_IEEE_F64BE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_dxzr); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_dxzr); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
     // Create a dataset id for projected xz density
-    dataset_id = H5Dcreate(file_id, "/T_xzr", H5T_IEEE_F32LE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/T_xzr", H5T_IEEE_F64BE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_Txzr); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_Txzr); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
 
     // Create a dataset id for projected xz density
-    dataset_id = H5Dcreate(file_id, "/vx_xzr", H5T_IEEE_F32LE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/vx_xzr", H5T_IEEE_F64BE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vxxzr); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vxxzr); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
     // Create a dataset id for projected xz density
-    dataset_id = H5Dcreate(file_id, "/vy_xzr", H5T_IEEE_F32LE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/vy_xzr", H5T_IEEE_F64BE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vyxzr); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vyxzr); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
     // Create a dataset id for projected xz density
-    dataset_id = H5Dcreate(file_id, "/vz_xzr", H5T_IEEE_F32LE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset_id = H5Dcreate(file_id, "/vz_xzr", H5T_IEEE_F64BE, dataspace_xzr_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     // Write the projected density array to file  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vzxzr); 
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_vzxzr); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2019,29 +2019,29 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     }
 
     // Write out the xy datasets for each variable 
-    dataset_id = H5Dcreate(file_id, "/d_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_d); 
+    dataset_id = H5Dcreate(file_id, "/d_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_d); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/mx_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mx); 
+    dataset_id = H5Dcreate(file_id, "/mx_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mx); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/my_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_my); 
+    dataset_id = H5Dcreate(file_id, "/my_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_my); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/mz_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mz); 
+    dataset_id = H5Dcreate(file_id, "/mz_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mz); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/E_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_E); 
+    dataset_id = H5Dcreate(file_id, "/E_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_E); 
     status = H5Dclose(dataset_id);
     #ifdef DE
-    dataset_id = H5Dcreate(file_id, "/GE_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_GE); 
+    dataset_id = H5Dcreate(file_id, "/GE_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_GE); 
     status = H5Dclose(dataset_id);
     #endif
     #ifdef SCALAR
-    dataset_id = H5Dcreate(file_id, "/scalar_xy", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_scalar); 
+    dataset_id = H5Dcreate(file_id, "/scalar_xy", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_scalar); 
     status = H5Dclose(dataset_id);
     #endif
     // Free the dataspace id
@@ -2126,29 +2126,29 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     }
 
     // Write out the xz datasets for each variable 
-    dataset_id = H5Dcreate(file_id, "/d_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_d); 
+    dataset_id = H5Dcreate(file_id, "/d_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_d); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/mx_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mx); 
+    dataset_id = H5Dcreate(file_id, "/mx_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mx); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/my_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_my); 
+    dataset_id = H5Dcreate(file_id, "/my_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_my); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/mz_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mz); 
+    dataset_id = H5Dcreate(file_id, "/mz_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mz); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/E_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_E); 
+    dataset_id = H5Dcreate(file_id, "/E_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_E); 
     status = H5Dclose(dataset_id);
     #ifdef DE
-    dataset_id = H5Dcreate(file_id, "/GE_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_GE); 
+    dataset_id = H5Dcreate(file_id, "/GE_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_GE); 
     status = H5Dclose(dataset_id);
     #endif
     #ifdef SCALAR
-    dataset_id = H5Dcreate(file_id, "/scalar_xz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_scalar); 
+    dataset_id = H5Dcreate(file_id, "/scalar_xz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_scalar); 
     status = H5Dclose(dataset_id);
     #endif
     // Free the dataspace id
@@ -2233,29 +2233,29 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     }
 
     // Write out the yz datasets for each variable 
-    dataset_id = H5Dcreate(file_id, "/d_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_d); 
+    dataset_id = H5Dcreate(file_id, "/d_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_d); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/mx_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mx); 
+    dataset_id = H5Dcreate(file_id, "/mx_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mx); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/my_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_my); 
+    dataset_id = H5Dcreate(file_id, "/my_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_my); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/mz_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mz); 
+    dataset_id = H5Dcreate(file_id, "/mz_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_mz); 
     status = H5Dclose(dataset_id);
-    dataset_id = H5Dcreate(file_id, "/E_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_E); 
+    dataset_id = H5Dcreate(file_id, "/E_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_E); 
     status = H5Dclose(dataset_id);
     #ifdef DE
-    dataset_id = H5Dcreate(file_id, "/GE_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_GE); 
+    dataset_id = H5Dcreate(file_id, "/GE_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_GE); 
     status = H5Dclose(dataset_id);
     #endif
     #ifdef SCALAR
-    dataset_id = H5Dcreate(file_id, "/scalar_yz", H5T_IEEE_F32LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_scalar); 
+    dataset_id = H5Dcreate(file_id, "/scalar_yz", H5T_IEEE_F64BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer_scalar); 
     status = H5Dclose(dataset_id);
     #endif
 
@@ -2501,13 +2501,13 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
 
   // Read in header values not set by grid initialization
   attribute_id = H5Aopen(file_id, "gamma", H5P_DEFAULT); 
-  status = H5Aread(attribute_id, H5T_NATIVE_FLOAT, &gama);
+  status = H5Aread(attribute_id, H5T_NATIVE_DOUBLE, &gama);
   status = H5Aclose(attribute_id);
   attribute_id = H5Aopen(file_id, "t", H5P_DEFAULT); 
-  status = H5Aread(attribute_id, H5T_NATIVE_FLOAT, &H.t);
+  status = H5Aread(attribute_id, H5T_NATIVE_DOUBLE, &H.t);
   status = H5Aclose(attribute_id);
   attribute_id = H5Aopen(file_id, "dt", H5P_DEFAULT); 
-  status = H5Aread(attribute_id, H5T_NATIVE_FLOAT, &H.dt);
+  status = H5Aread(attribute_id, H5T_NATIVE_DOUBLE, &H.dt);
   status = H5Aclose(attribute_id);
   attribute_id = H5Aopen(file_id, "n_step", H5P_DEFAULT); 
   status = H5Aread(attribute_id, H5T_NATIVE_INT, &H.n_step);
@@ -2523,7 +2523,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the density dataset
     dataset_id = H5Dopen(file_id, "/density", H5P_DEFAULT);
     // Read the density array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2535,7 +2535,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the x momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_x", H5P_DEFAULT);
     // Read the x momentum array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2547,7 +2547,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the y momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_y", H5P_DEFAULT);
     // Read the x momentum array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2559,7 +2559,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the z momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_x", H5P_DEFAULT);
     // Read the x momentum array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2571,7 +2571,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the Energy dataset
     dataset_id = H5Dopen(file_id, "/Energy", H5P_DEFAULT);
     // Read the Energy array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2584,7 +2584,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the internal energy dataset
     dataset_id = H5Dopen(file_id, "/GasEnergy", H5P_DEFAULT);
     // Read the Energy array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2605,7 +2605,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
       // Open the passive scalar dataset
       dataset_id = H5Dopen(file_id, dataset, H5P_DEFAULT);
       // Read the scalar array into the dataset buffer // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
 
@@ -2628,7 +2628,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the density dataset
     dataset_id = H5Dopen(file_id, "/density", H5P_DEFAULT);
     // Read the density array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2645,7 +2645,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the x momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_x", H5P_DEFAULT);
     // Read the x momentum array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2662,7 +2662,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the y momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_y", H5P_DEFAULT);
     // Read the y momentum array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2679,7 +2679,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the z momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_z", H5P_DEFAULT);
     // Read the z momentum array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2696,7 +2696,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the Energy dataset
     dataset_id = H5Dopen(file_id, "/Energy", H5P_DEFAULT);
     // Read the Energy array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2714,7 +2714,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the internal energy dataset
     dataset_id = H5Dopen(file_id, "/GasEnergy", H5P_DEFAULT);
     // Read the internal energy array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2741,7 +2741,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
       // Open the scalar dataset
       dataset_id = H5Dopen(file_id, dataset, H5P_DEFAULT);
       // Read the scalar array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
 
@@ -2772,7 +2772,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the density dataset
     dataset_id = H5Dopen(file_id, "/density", H5P_DEFAULT);
     // Read the density array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
     
@@ -2813,7 +2813,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the x momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_x", H5P_DEFAULT);
     // Read the x momentum array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
     
@@ -2851,7 +2851,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the y momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_y", H5P_DEFAULT);
     // Read the y momentum array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2890,7 +2890,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the z momentum dataset
     dataset_id = H5Dopen(file_id, "/momentum_z", H5P_DEFAULT);
     // Read the z momentum array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2929,7 +2929,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the Energy dataset
     dataset_id = H5Dopen(file_id, "/Energy", H5P_DEFAULT);
     // Read the Energy array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
 
@@ -2969,7 +2969,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     // Open the internal Energy dataset
     dataset_id = H5Dopen(file_id, "/GasEnergy", H5P_DEFAULT);
     // Read the internal Energy array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-    status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
     // Free the dataset id
     status = H5Dclose(dataset_id);
     
@@ -3037,7 +3037,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
       // Open the scalar dataset
       dataset_id = H5Dopen(file_id, dataset, H5P_DEFAULT);
       // Read the scalar array into the dataset buffer  // NOTE: NEED TO FIX FOR FLOAT REAL!!!
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer); 
       // Free the dataset id
       status = H5Dclose(dataset_id);
 
@@ -3091,7 +3091,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     }
     else{
       dataset_id = H5Dopen(file_id, "/HI_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {
@@ -3104,7 +3104,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
         }
       }
       dataset_id = H5Dopen(file_id, "/HII_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {
@@ -3116,7 +3116,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
         }
       }
       dataset_id = H5Dopen(file_id, "/HeI_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {
@@ -3128,7 +3128,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
         }
       }
       dataset_id = H5Dopen(file_id, "/HeII_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {
@@ -3140,7 +3140,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
         }
       }
       dataset_id = H5Dopen(file_id, "/HeIII_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {
@@ -3152,7 +3152,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
         }
       }
       dataset_id = H5Dopen(file_id, "/e_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {
@@ -3165,7 +3165,7 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
       }
       #ifdef GRACKLE_METALS
       dataset_id = H5Dopen(file_id, "/metal_density", H5P_DEFAULT);
-      status = H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
+      status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataset_buffer);
       status = H5Dclose(dataset_id);
       for (k=0; k<H.nz_real; k++) {
         for (j=0; j<H.ny_real; j++) {

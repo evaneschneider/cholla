@@ -75,9 +75,9 @@ class Cluster
      *  \brief Current E_dot from S99 fluxes */
     Real E_dot;
 
-    /*! \fn Initialize(void)
+    /*! \fn Initialize(Real t)
      *  \brief Set the initial cluster variables */
-    void Initialize(void);
+    void Initialize(Real t);
 
     /*! \fn Rotate(Real dt)
      *  \brief Rotate the cluster position given a time step */

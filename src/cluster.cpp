@@ -14,7 +14,7 @@
 float S99_table[1000][3];
 float cluster_list[N_CL][5];
 
-void Cluster::Initialize(void) {
+void Cluster::Initialize(Real t) {
 
   flag_on = 0;
   // set the initial cluster mass, radial, azimuthal, and vertical positions from the table
@@ -32,7 +32,18 @@ void Cluster::Initialize(void) {
 
   R_cl = 0.03;
   V_cl = (4./3.)*PI*R_cl*R_cl*R_cl;
-  
+
+  Real SF_total;
+  Real SFR = 20000;
+
+  // loop through time steps to turn on clusters for restarts
+  for (int i=0; i<floor(t); i+=1000) {
+    SF_total = SFR*i;
+    if (SF_total > SF_cl) {
+      flag_on = 1;
+      Rotate(floor(t)-i);
+    }
+  }
 }
 
 void Cluster::Switch(Real t) {
