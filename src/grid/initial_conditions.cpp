@@ -1213,7 +1213,7 @@ void Grid3D::Clouds()
   Real vz_bg, vz_cl;
   Real T_bg, T_cl; // background and cloud temperature
   Real p_bg, p_cl; // background and cloud pressure
-  Real mu = 0.6; // mean atomic weight
+  Real mu = 1.0; // mean atomic weight
   int N_cl = 1; // number of clouds
   Real R_cl = 2.5; // cloud radius in code units (kpc)
   Real cl_pos[N_cl][3]; // array of cloud positions
@@ -1235,9 +1235,8 @@ void Grid3D::Clouds()
     printf("Cloud positions: %f %f %f\n", cl_pos[nn][0], cl_pos[nn][1], cl_pos[nn][2]);
   }
 
-  n_bg = 1.68e-4;
+  // n_bg = 1.8e-4;
   n_cl  = 5.4e-2;
-  rho_bg = n_bg*mu*MP/DENSITY_UNIT;
   rho_cl  = n_cl*mu*MP/DENSITY_UNIT;
   vx_bg = 0.0;
   //vx_c  = -200*TIME_UNIT/KPC; // convert from km/s to kpc/kyr
@@ -1246,8 +1245,12 @@ void Grid3D::Clouds()
   vz_bg = vz_cl = 0.0;
   T_bg = 3e6;
   T_cl = 1e4;
-  p_bg = n_bg*KB*T_bg / PRESSURE_UNIT;
-  p_cl = p_bg;
+  p_cl = n_cl*KB*T_cl;
+  n_bg = p_bg / (KB*T_bg);
+  rho_bg = n_bg*mu*MP/DENSITY_UNIT;
+  p_cl = p_cl / PRESSURE_UNIT;
+  p_bg = p_cl;
+
 
   istart = H.n_ghost;
   iend   = H.nx-H.n_ghost;
