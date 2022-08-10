@@ -9,15 +9,14 @@
 #include "../global/global.h"
 #include "../grid/grid3D.h"
 #include "../hydro/hydro_cuda.h" // provides Calc_dt_GPU
-#include "../integrators/CTU_1D_cuda.h"
-#include "../integrators/CTU_2D_cuda.h"
-#include "../integrators/CTU_3D_cuda.h"
 #include "../integrators/VL_1D_cuda.h"
 #include "../integrators/VL_2D_cuda.h"
 #include "../integrators/VL_3D_cuda.h"
 #include "../io/io.h"
 #include "../utils/error_handling.h"
 #include "../utils/ran.h"
+#include "../integrators/simple_1D_cuda.h"
+#include "../integrators/simple_2D_cuda.h"
 #include "../integrators/simple_3D_cuda.h"
 #ifdef MPI_CHOLLA
 #include <mpi.h>
@@ -27,7 +26,6 @@
 #include "../mpi/mpi_routines.h"
 #endif
 #include <stdio.h>
-#include "../old_cholla/flux_correction.h"
 #ifdef CLOUDY_COOL
 #include "../cooling/cooling_wrapper.h"
 #endif
@@ -184,9 +182,6 @@ void Grid3D::Initialize(struct parameters *P)
     flag_init = 1;
   }
 
-  // Set the flag that tells Update_Grid which buffer to read from
-  gflag = 0;
-
   // Set header variables for time within the simulation
   H.t = 0.0;
   // and the number of timesteps taken
@@ -310,10 +305,9 @@ void Grid3D::AllocateMemory(void)
   C.d_GasEnergy  = &(C.device[(H.n_fields-1)*H.n_cells]);
   #endif  // DE
 
-  // set the number of thread blocks for the GPU grid (declared in global_cuda)
-  ngrid = (H.n_cells + TPB - 1) / TPB;
 
   // arrays that hold the max_dti calculation for hydro for each thread block (pre reduction)
+  int ngrid = (H.n_cells + TPB - 1) / TPB;
   CudaSafeCall( cudaHostAlloc(&host_dti_array, ngrid*sizeof(Real), cudaHostAllocDefault) );
   CudaSafeCall( cudaMalloc((void**)&dev_dti_array, ngrid*sizeof(Real)) );
   CudaSafeCall( cudaMalloc((void**)&dev_dti, sizeof(Real)) );
@@ -432,31 +426,28 @@ Real Grid3D::Update_Grid(void)
   if (H.nx > 1 && H.ny == 1 && H.nz == 1) //1D
   {
     #ifdef CUDA
-    #ifdef CTU
-    CTU_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields);
-    #endif //not_VL
     #ifdef VL
     VL_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields);
     #endif //VL
+    #ifdef SIMPLE
+    Simple_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields);
+    #endif //SIMPLE
     #endif //CUDA
   }
   else if (H.nx > 1 && H.ny > 1 && H.nz == 1) //2D
   {
     #ifdef CUDA
-    #ifdef CTU
-    CTU_Algorithm_2D_CUDA(C.device, H.nx, H.ny, x_off, y_off, H.n_ghost, H.dx, H.dy, H.xbound, H.ybound, H.dt, H.n_fields);
-    #endif //not_VL
     #ifdef VL
     VL_Algorithm_2D_CUDA(C.device, H.nx, H.ny, x_off, y_off, H.n_ghost, H.dx, H.dy, H.xbound, H.ybound, H.dt, H.n_fields);
     #endif //VL
+    #ifdef SIMPLE 
+    Simple_Algorithm_2D_CUDA(C.device, H.nx, H.ny, x_off, y_off, H.n_ghost, H.dx, H.dy, H.xbound, H.ybound, H.dt, H.n_fields);
+    #endif //SIMPLE
     #endif //CUDA
   }
   else if (H.nx > 1 && H.ny > 1 && H.nz > 1) //3D
   {
     #ifdef CUDA
-    #ifdef CTU
-    CTU_Algorithm_3D_CUDA(C.device, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy, H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, density_floor, U_floor, C.Grav_potential );
-    #endif //not_VL
     #ifdef VL
     VL_Algorithm_3D_CUDA(C.device, C.d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy, H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, density_floor, U_floor, C.Grav_potential );
     #endif //VL
@@ -476,10 +467,7 @@ Real Grid3D::Update_Grid(void)
 
   #ifdef COOLING_GPU
   // ==Apply Cooling from cooling/cooling_cuda.h==
-  Cooling_Update(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dt, gama, dev_dti_array);
-  // ==Calculate cooling dt from cooling/cooling_cuda.h==
-  // dev_dti_array and host_dti_array are global variables declared in global/global_cuda.h and allocated in Allocate_Memory
-  Real cooling_max_dti = Cooling_Calc_dt(dev_dti_array, host_dti_array, H.nx, H.ny, H.nz);
+  Cooling_Update(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dt, gama);
   #endif //COOLING_GPU
 
   // Update the H and He ionization fractions and apply cooling and photoheating
@@ -499,9 +487,6 @@ Real Grid3D::Update_Grid(void)
 
   // ==Calculate the next time step with Calc_dt_GPU from hydro/hydro_cuda.h==
   max_dti = Calc_dt_GPU(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_cells, H.dx, H.dy, H.dz, gama );
-  #ifdef COOLING_GPU
-  max_dti = fmax(max_dti, cooling_max_dti);
-  #endif // COOLING_GPU
   #endif // CUDA
 
   #ifdef COOLING_GRACKLE
@@ -526,8 +511,6 @@ Real Grid3D::Update_Grid(void)
   C.e_density     = &C.scalar[ 5*H.n_cells ];
   #endif
 
-  // reset the grid flag to swap buffers
-  gflag = (gflag+1)%2;
 
   return max_dti;
 
@@ -634,17 +617,14 @@ void Grid3D::FreeMemory(void)
   #endif
 
   // If memory is single allocated, free the memory at the end of the simulation.
-  #ifdef CTU
-  if (H.nx > 1 && H.ny == 1 && H.nz == 1) Free_Memory_CTU_1D();
-  if (H.nx > 1 && H.ny > 1 && H.nz == 1) Free_Memory_CTU_2D();
-  if (H.nx > 1 && H.ny > 1 && H.nz > 1) Free_Memory_CTU_3D();
-  #endif //CTU
   #ifdef VL
   if (H.nx > 1 && H.ny == 1 && H.nz == 1) Free_Memory_VL_1D();
   if (H.nx > 1 && H.ny > 1 && H.nz == 1) Free_Memory_VL_2D();
   if (H.nx > 1 && H.ny > 1 && H.nz > 1) Free_Memory_VL_3D();
   #endif // VL
   #ifdef SIMPLE
+  if (H.nx > 1 && H.ny == 1 && H.nz == 1) Free_Memory_Simple_1D();
+  if (H.nx > 1 && H.ny > 1 && H.nz == 1) Free_Memory_Simple_2D();
   if (H.nx > 1 && H.ny > 1 && H.nz > 1) Free_Memory_Simple_3D();
   #endif // SIMPLE
 
