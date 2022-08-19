@@ -1280,7 +1280,8 @@ void Grid3D::Clouds()
   T_bg = 3e6;
   T_cl = 1e4;
   p_cl = n_cl*KB*T_cl;
-  n_bg = p_bg / (KB*T_bg);
+  n_bg = p_cl / (KB*T_bg);
+  printf("%e\n", n_bg);
   rho_bg = n_bg*mu*MP/DENSITY_UNIT;
   p_cl = p_cl / PRESSURE_UNIT;
   p_bg = p_cl;
