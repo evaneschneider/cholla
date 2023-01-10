@@ -66,6 +66,31 @@ static constexpr int maxWarpsPerBlock = 1024/WARPSIZE;
 #define cudaPointerAttributes hipPointerAttribute_t
 #define cudaPointerGetAttributes hipPointerGetAttributes
 
+// Texture definitions
+#define cudaArray hipArray
+#define cudaMallocArray hipMallocArray 
+#define cudaFreeArray hipFreeArray
+#define cudaMemcpyToArray hipMemcpyToArray
+#define cudaMemcpy2DToArray hipMemcpy2DToArray
+
+
+#define cudaTextureObject_t hipTextureObject_t
+#define cudaCreateTextureObject hipCreateTextureObject
+#define cudaDestroyTextureObject hipDestroyTextureObject
+
+#define cudaChannelFormatDesc hipChannelFormatDesc
+#define cudaCreateChannelDesc hipCreateChannelDesc
+#define cudaChannelFormatKindFloat hipChannelFormatKindFloat
+
+#define cudaResourceDesc hipResourceDesc
+#define cudaResourceTypeArray hipResourceTypeArray
+#define cudaTextureDesc hipTextureDesc
+#define cudaAddressModeClamp hipAddressModeClamp
+#define cudaFilterModeLinear hipFilterModeLinear
+#define cudaFilterModePoint hipFilterModePoint 
+// Texture Definitions
+
+// FFT definitions
 #define cufftDestroy hipfftDestroy
 #define cufftDoubleComplex hipfftDoubleComplex
 #define cufftDoubleReal hipfftDoubleReal
@@ -75,6 +100,10 @@ static constexpr int maxWarpsPerBlock = 1024/WARPSIZE;
 #define cufftHandle hipfftHandle
 #define cufftPlan3d hipfftPlan3d
 #define cufftPlanMany hipfftPlanMany
+
+#define curandStateMRG32k3a_t hiprandStateMRG32k3a_t
+#define curand_init hiprand_init
+#define curand_poisson hiprand_poisson
 
 static void __attribute__((unused)) check(const hipError_t err, const char *const file, const int line)
 {

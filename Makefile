@@ -12,7 +12,7 @@ DIRS     := src src/analysis src/chemistry_gpu src/cooling src/cooling_grackle s
             src/cpu src/global src/gravity src/gravity/paris src/grid src/hydro \
             src/integrators src/io src/main.cpp src/main_tests.cpp \
             src/model src/mpi src/old_cholla src/particles src/reconstruction \
-            src/riemann_solvers src/system_tests src/utils
+            src/riemann_solvers src/system_tests src/utils src/dust
 
 SUFFIX ?= .$(TYPE).$(MACHINE)
 
@@ -97,6 +97,13 @@ ifeq ($(findstring -DPARIS,$(DFLAGS)),-DPARIS)
   else
     DFLAGS += -DPARIS_3PT
   endif
+endif
+
+ifeq ($(findstring -DSUPERNOVA,$(DFLAGS)),-DSUPERNOVA)
+    ifdef HIPCONFIG
+	CXXFLAGS += -I$(ROCM_PATH)/include/hiprand -I$(ROCM_PATH)/hiprand/include
+	GPUFLAGS += -I$(ROCM_PATH)/include/hiprand -I$(ROCM_PATH)/hiprand/include
+    endif
 endif
 
 ifeq ($(findstring -DHDF5,$(DFLAGS)),-DHDF5)
@@ -185,7 +192,7 @@ clean:
 	-find bin/ -type f -executable -name "cholla.*.$(MACHINE)*" -exec rm -f '{}' \;
 
 clobber: clean
-	find . -type f -executable -name "cholla*" -exec rm -f '{}' \;
+	-find bin/ -type f -executable -name "cholla*" -exec rm -f '{}' \;
 	-find bin/ -type d -name "t*" -prune -exec rm -rf '{}' \;
 	rm -rf bin/cholla.*tests*.xml
 

@@ -319,6 +319,14 @@ class Grid3D
     Analysis_Module Analysis;
     #endif
 
+    #ifdef SUPERNOVA //TODO refactor this into Analysis module
+    Real countSN;
+    Real countResolved;
+    Real countUnresolved;
+    Real totalEnergy;
+    Real totalMomentum;
+    Real totalUnresEnergy;
+    #endif
     struct Conserved
     {
       /*! pointer to conserved variable array on the host */
@@ -346,8 +354,13 @@ class Grid3D
 
       #ifdef SCALAR
       /*! \var scalar
-       *  \brief Array containing the values of the passive scalar variable(s). */
+       *  \brief Array containing the values of passive scalar variable(s). */
       Real *scalar;
+      #ifdef BASIC_SCALAR
+      /*! \var basic_scalar
+       *  \brief Array containing the values of a basic passive scalar variable. */
+      Real *basic_scalar;
+      #endif
       #endif  // SCALAR
 
       #ifdef MHD
@@ -394,7 +407,8 @@ class Grid3D
       /*! pointer to conserved variable on device */
       Real *device;
       Real *d_density, *d_momentum_x, *d_momentum_y, *d_momentum_z,
-           *d_Energy, *d_scalar, *d_magnetic_x, *d_magnetic_y, *d_magnetic_z,
+	   *d_Energy, *d_scalar, *d_basic_scalar, 
+	   *d_magnetic_x, *d_magnetic_y, *d_magnetic_z,
            *d_GasEnergy;
 
        /*! pointer to gravitational potential on device */
@@ -623,6 +637,10 @@ class Grid3D
      *  \brief Select appropriate custom boundary function. */
     void Custom_Boundary(char bcnd[MAXLEN]);
 
+    /*! \fn void Wind_Boundary()
+     *  \brief Apply a constant wind to the -x boundary. */
+    void Wind_Boundary();
+
     /*! \fn void Noh_Boundary()
      *  \brief Apply analytic boundary conditions to +x, +y (and +z) faces,
         as per the Noh problem in Liska, 2003, or in Stone, 2008. */
@@ -697,8 +715,13 @@ class Grid3D
   #endif//GRAVITY
 
   #ifdef GRAVITY_ANALYTIC_COMP
-  void Add_Analytic_Potential(struct parameters *P);
-  void Add_Analytic_Galaxy_Potential(int g_start, int g_end, DiskGalaxy& gal);
+  void Add_Analytic_Potential();
+  void Add_Analytic_Potential(int g_start, int g_end);
+  void Setup_Analytic_Potential(struct parameters *P);
+  void Setup_Analytic_Galaxy_Potential(int g_start, int g_end, DiskGalaxy& gal);
+  #ifdef GRAVITY_GPU
+  void Add_Analytic_Potential_GPU();
+  #endif
   #endif //GRAVITY_ANALYTIC_COMP
 
   #ifdef PARTICLES
@@ -711,7 +734,9 @@ class Grid3D
   void Transfer_Particles_Boundaries( struct parameters P );
   Real Update_Grid_and_Particles_KDK( struct parameters P );
   void Set_Particles_Boundary( int dir, int side);
-  void Set_Particles_Open_Boundary(int dir, int side);
+  #ifdef PARTICLES_CPU
+  void Set_Particles_Open_Boundary_CPU(int dir, int side);
+  #endif
   #ifdef MPI_CHOLLA
   int Load_Particles_Density_Boundary_to_Buffer( int direction, int side, Real *buffer );
   void Unload_Particles_Density_Boundary_From_Buffer( int direction, int side, Real *buffer );
@@ -829,15 +854,6 @@ class Grid3D
   #endif
   #endif//LYA_STATISTICS
   #endif//ANALYSIS
-
-  #ifdef PARTICLES
-  #ifdef DE
-  #ifdef PARTICLE_AGE
-  void Cluster_Feedback();
-  void Cluster_Feedback_Function(part_int_t p_start, part_int_t p_end);
-  #endif
-  #endif
-  #endif
 
 };
 

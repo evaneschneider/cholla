@@ -5,6 +5,8 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "../grid/grid_enum.h" // defines NSCALARS
+
 #ifdef COOLING_CPU
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_spline2d.h>
@@ -32,6 +34,7 @@ typedef double Real;
 #define KB 1.380658e-16 // boltzmann constant, cgs
 //#define GN 6.67259e-8 // gravitational constant, cgs
 #define GN 4.49451e-18 // gravitational constant, kpc^3 / M_sun / kyr^2
+#define C_L 0.306594593 // speed of light in kpc/kyr
 
 #define MYR 31.536e12 //Myears in secs
 #define KPC 3.086e16 // kpc in km
@@ -54,7 +57,7 @@ typedef double Real;
 #define LOG_FILE_NAME "run_output.log"
 
 //Conserved Floor Values
-#define TEMP_FLOOR 1e-3 // in Kelvin
+#define TEMP_FLOOR 1e-3
 #define DENS_FLOOR 1e-5 // in code units
 
 //Parameter for Enzo dual Energy Condition
@@ -65,22 +68,7 @@ typedef double Real;
 #define MAX_DELTA_A 0.001
 #define MAX_EXPANSION_RATE 0.01  // Limit delta(a)/a
 
-#ifdef COOLING_GRACKLE
-  #ifdef GRACKLE_METALS
-  #define NSCALARS 7
-  #else
-  #define NSCALARS 6
-  #endif // GRACKLE_METALS
-#elif CHEMISTRY_GPU
-  #define NSCALARS 6
-#else
-#ifdef SCALAR
-// Set Number of scalar fields when not using grackle
-#define NSCALARS 1
-#else
-#define NSCALARS 0
-#endif//SCALAR
-#endif//COOLING_GRACKLE
+
 
 #ifdef  MHD
   #define N_MHD_FIELDS 3
@@ -204,6 +192,20 @@ struct parameters
   int n_projection;
   int n_rotated_projection;
   int n_slice;
+  int n_out_float32=0;
+  int out_float32_density=0;
+  int out_float32_momentum_x=0;
+  int out_float32_momentum_y=0;
+  int out_float32_momentum_z=0;
+  int out_float32_Energy=0;
+#ifdef DE
+  int out_float32_GasEnergy=0;
+#endif
+#ifdef MHD
+  int out_float32_magnetic_x=0;
+  int out_float32_magnetic_y=0;
+  int out_float32_magnetic_z=0;
+#endif
   Real xmin;
   Real ymin;
   Real zmin;

@@ -92,17 +92,6 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
    }
 }
 
-
-
-/*! \fn Real minof3(Real a, Real b, Real c)
- *  \brief Returns the minimum of three floating point numbers. */
-__device__ inline Real minof3(Real a, Real b, Real c)
-{
-  return fmin(a, fmin(b,c));
-}
-
-
-
 /*! \fn int sgn_CUDA
  *  \brief Mathematical sign function. Returns sign of x. */
 __device__ inline int sgn_CUDA(Real x)
@@ -112,8 +101,21 @@ __device__ inline int sgn_CUDA(Real x)
 }
 
 
-__global__ void test_function();
-
+//Define atomic_add if it's not supported
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
+#else
+__device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                __double_as_longlong(val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+#endif
 
 
 #endif //GLOBAL_CUDA_H

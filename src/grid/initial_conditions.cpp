@@ -1,5 +1,5 @@
 /*! \file initial_conditions.cpp
- *  \brief Definitions of initial conditions for different tests.
+/*  \brief Definitions of initial conditions for different tests.
            Note that the grid is mapped to 1D as i + (x_dim)*j + (x_dim*y_dim)*k.
            Functions are members of the Grid3D class. */
 
@@ -57,15 +57,8 @@ void Grid3D::Set_Initial_Conditions(parameters P) {
     Noh_3D();
   } else if (strcmp(P.init, "Disk_2D")==0) {
     Disk_2D();
-  } else if (strcmp(P.init, "Disk_3D")==0) {
+  } else if (strcmp(P.init, "Disk_3D")==0 || strcmp(P.init, "Disk_3D_particles")==0) {
     Disk_3D(P);
-  } else if (strcmp(P.init, "Disk_3D_particles")==0) {
-    #ifndef ONLY_PARTICLES
-    Disk_3D(P);
-    #else
-    // Initialize a m hydro grid when only integrating particles
-    Uniform_Grid();
-    #endif
   } else if (strcmp(P.init, "Spherical_Overpressure_3D")==0) {
     Spherical_Overpressure_3D();
   } else if (strcmp(P.init, "Spherical_Overdensity_3D")==0) {
@@ -233,13 +226,11 @@ void Grid3D::Constant(Real rho, Real vx, Real vy, Real vz, Real P, Real Bx, Real
           C.GasEnergy[id]  = P/(gama-1.0);
           #endif  // DE
         }
-/*
         if (i==istart && j==jstart && k==kstart) {
           n = rho*DENSITY_UNIT / (mu*MP);
           T = P*PRESSURE_UNIT / (n*KB);
           printf("Initial n = %e, T = %e\n", n, T);
         }
-*/
       }
     }
   }
@@ -356,7 +347,9 @@ void Grid3D::Square_Wave(Real rho, Real vx, Real vy, Real vz, Real P, Real A)
         C.GasEnergy[id]  = P/(gama-1.0);
         #endif
         #ifdef SCALAR
-        C.scalar[id] = C.density[id]*0.0;
+	#ifdef BASIC_SCALAR
+        C.basic_scalar[id] = C.density[id]*0.0;
+	#endif
         #endif
         if (x_pos > 0.25*H.xdglobal && x_pos < 0.75*H.xdglobal)
         {
@@ -369,7 +362,9 @@ void Grid3D::Square_Wave(Real rho, Real vx, Real vy, Real vz, Real P, Real A)
           C.GasEnergy[id]  = P/(gama-1.0);
           #endif
           #ifdef SCALAR
-          C.scalar[id] = C.density[id]*1.0;
+	  #ifdef BASIC_SCALAR
+          C.basic_scalar[id] = C.density[id]*1.0;
+	  #endif
           #endif
         }
       }
@@ -458,7 +453,9 @@ void Grid3D::Riemann(Real rho_l, Real vx_l, Real vy_l, Real vz_l, Real P_l, Real
             C.momentum_z[id] = rho_l * vz_l;
             C.Energy[id]     = P_l/(gama-1.0) + 0.5*rho_l*(vx_l*vx_l + vy_l*vy_l + vz_l*vz_l);
             #ifdef SCALAR
-            C.scalar[id] = 1.0*rho_l;
+	    #ifdef BASIC_SCALAR
+            C.basic_scalar[id] = 1.0*rho_l;
+	    #endif
             #endif  //SCALAR
             #ifdef DE
             C.GasEnergy[id]  = P_l/(gama-1.0);
@@ -472,7 +469,9 @@ void Grid3D::Riemann(Real rho_l, Real vx_l, Real vy_l, Real vz_l, Real P_l, Real
             C.momentum_z[id] = rho_r * vz_r;
             C.Energy[id]     = P_r/(gama-1.0) + 0.5*rho_r*(vx_r*vx_r + vy_r*vy_r + vz_r*vz_r);
             #ifdef SCALAR
-            C.scalar[id] = 0.0*rho_r;
+	    #ifdef BASIC_SCALAR
+            C.basic_scalar[id] = 0.0*rho_r;
+	    #endif
             #endif  //SCALAR
             #ifdef DE
             C.GasEnergy[id]  = P_r/(gama-1.0);
@@ -623,7 +622,9 @@ void Grid3D::KH()
           C.momentum_y[id] = C.density[id]*A*sin(4*PI*x_pos);
           C.momentum_z[id] = 0.0;
           #ifdef SCALAR
-          C.scalar[id] = 0.0;
+	  #ifdef BASIC_SCALAR
+          C.basic_scalar[id] = 0.0;
+	  #endif
           #endif
         }
         else if (y_pos >= 3.0*H.ydglobal/4.0)
@@ -634,7 +635,9 @@ void Grid3D::KH()
           C.momentum_z[id] = 0.0;
 
           #ifdef SCALAR
-          C.scalar[id] = 0.0;
+	  #ifdef BASIC_SCALAR
+          C.basic_scalar[id] = 0.0;
+	  #endif
           #endif
         }
         // inner half of slab
@@ -646,7 +649,9 @@ void Grid3D::KH()
           C.momentum_z[id] = 0.0;
        
           #ifdef SCALAR
-          C.scalar[id] = 1.0*d1;
+	  #ifdef BASIC_SCALAR
+          C.basic_scalar[id] = 1.0*d1;
+	  #endif
           #endif
         }
 	C.Energy[id] = P/(gama-1.0) + 0.5*(C.momentum_x[id]*C.momentum_x[id] + C.momentum_y[id]*C.momentum_y[id])/C.density[id];
@@ -1182,17 +1187,18 @@ void Grid3D::Spherical_Overdensity_3D()
  int i, j, k, id;
  Real x_pos, y_pos, z_pos, r, center_x, center_y, center_z;
  Real density, pressure, overDensity, overPressure, energy, radius, background_density;
+ Real mu = 0.6;
  Real vx, vy, vz, v2;
- center_x = 0.5;
- center_y = 0.5;
- center_z = 0.5;
- overDensity = 1;
+ center_x = 0.0;
+ center_y = 0.0;
+ center_z = 0.0;
+ overDensity = 1000 * mu * MP / DENSITY_UNIT; // 100 particles per cm^3
  overPressure = 0;
  vx = 0;
  vy = 0;
  vz = 0;
- radius = 0.2;
- background_density = 0.0005;
+ radius = 0.02;
+ background_density = mu * MP / DENSITY_UNIT; // 1 particles per cm^3
  H.sphere_density = overDensity;
  H.sphere_radius = radius;
  H.sphere_background_density = background_density;
@@ -1323,7 +1329,9 @@ void Grid3D::Clouds()
         C.GasEnergy[id]  = p_bg/(gama-1.0);
         #endif
         #ifdef SCALAR
-        C.scalar[id] = C.density[id]*0.0;
+        #ifdef BASIC_SCALAR
+          C.basic_scalar[id] = C.density[id]*0.0;
+        #endif
         #endif
         // add clouds 
         for (int nn = 0; nn<N_cl; nn++) {
@@ -1336,10 +1344,11 @@ void Grid3D::Clouds()
             C.Energy[id]     = p_cl/(gama-1.0) + 0.5*rho_cl*(vx_cl*vx_cl + vy_cl*vy_cl + vz_cl*vz_cl);
             #ifdef DE
             C.GasEnergy[id]  = p_cl/(gama-1.0);
-            #endif
-            #ifdef SCALAR
-            C.scalar[id] = C.density[id]*0.3;
-            #endif
+            #endif // DE
+
+            #ifdef DUST
+              C.host[id+H.n_cells*grid_enum::dust_density] = rho_cl*1e-2;
+            #endif // DUST
           }
         }
       }
@@ -1597,14 +1606,14 @@ void Grid3D::Chemistry_Test( struct parameters P )
 
 
         #ifdef COOLING_GRACKLE
-        C.scalar[0*H.n_cells + id] = rho_gas_mean * HI_frac;
-        C.scalar[1*H.n_cells + id] = rho_gas_mean * HII_frac;
-        C.scalar[2*H.n_cells + id] = rho_gas_mean * HeI_frac;
-        C.scalar[3*H.n_cells + id] = rho_gas_mean * HeII_frac;
-        C.scalar[4*H.n_cells + id] = rho_gas_mean * HeIII_frac;
-        C.scalar[5*H.n_cells + id] = rho_gas_mean * e_frac;
+        C.HI_density[id]    =  rho_gas_mean * HI_frac;
+        C.HII_density[id]   =  rho_gas_mean * HII_frac;
+        C.HeI_density[id]   =  rho_gas_mean * HeI_frac;
+        C.HeII_density[id]  =  rho_gas_mean * HeII_frac;
+        C.HeIII_density[id] =  rho_gas_mean * HeIII_frac;
+        C.e_density[id]     =  rho_gas_mean * e_frac;
         #ifdef GRACKLE_METALS
-        C.scalar[6*H.n_cells + id] = rho_gas_mean * metal_frac;
+	C.metal_density[id] =  rho_gas_mean * metal_frac;	
         #endif
         #endif
 
