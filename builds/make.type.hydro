@@ -7,8 +7,8 @@ DFLAGS    += -DPPMC
 DFLAGS    += -DHLLC
 
 # Integrator
-#DFLAGS    += -DSIMPLE
-DFLAGS    += -DVL
+DFLAGS    += -DSIMPLE
+#DFLAGS    += -DVL
 
 # Apply a density and temperature floor
 DFLAGS    += -DDENSITY_FLOOR
