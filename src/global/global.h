@@ -28,21 +28,19 @@ typedef double Real;
 
 #define MAXLEN      2048
 #define TINY_NUMBER 1.0e-20
-#define PI          3.141592653589793
 #define MP          1.672622e-24  // mass of proton, grams
 #define KB          1.380658e-16  // boltzmann constant, cgs
 // #define GN 6.67259e-8 // gravitational constant, cgs
 #define GN  4.49451e-18  // gravitational constant, kpc^3 / M_sun / kyr^2
 #define C_L 0.306594593  // speed of light in kpc/kyr
 
-#define MYR 31.536e12  // Myears in secs
-#define KPC 3.086e16   // kpc in km
-#define G_COSMO \
-  4.300927161e-06;            // gravitational constant, kpc km^2 s^-2 Msun^-1
-#define MSUN_CGS 1.98847e33;  // Msun in gr
-#define KPC_CGS  3.086e21;    // kpc in cm
-#define KM_CGS   1e5;         // km in cm
-#define MH       1.67262171e-24  // Mass of hydrogen [g]
+#define MYR      31.536e12         // Myears in secs
+#define KPC      3.086e16          // kpc in km
+#define G_COSMO  4.300927161e-06;  // gravitational constant, kpc km^2 s^-2 Msun^-1
+#define MSUN_CGS 1.98847e33;       // Msun in gr
+#define KPC_CGS  3.086e21;         // kpc in cm
+#define KM_CGS   1e5;              // km in cm
+#define MH       1.67262171e-24    // Mass of hydrogen [g]
 
 #define TIME_UNIT           3.15569e10     // 1 kyr in s
 #define LENGTH_UNIT         3.08567758e21  // 1 kpc in cm
@@ -98,9 +96,8 @@ typedef double Real;
         3  // 3 ghost cells are needed for 5 point gradient, ( one is for the
            // CIC interpolation of the potential )
     #else
-      #define N_GHOST_POTENTIAL \
-        2   // 2 ghost cells are needed for 5 point gradient
-    #endif  // PARTICLES
+      #define N_GHOST_POTENTIAL 2  // 2 ghost cells are needed for 5 point gradient
+    #endif                         // PARTICLES
 
   #else
     #ifdef PARTICLES
@@ -108,10 +105,9 @@ typedef double Real;
         2  // 2 ghost cells are needed for 3 point gradient, ( one is for the
            // CIC interpolation of the potential )
     #else
-      #define N_GHOST_POTENTIAL \
-        1   // 1 ghost cells are needed for 3 point gradient
-    #endif  // PARTICLES
-  #endif    // GRAVITY_5_POINTS_GRADIENT
+      #define N_GHOST_POTENTIAL 1  // 1 ghost cells are needed for 3 point gradient
+    #endif                         // PARTICLES
+  #endif                           // GRAVITY_5_POINTS_GRADIENT
 
 typedef long int grav_int_t;
 #endif
@@ -230,32 +226,32 @@ struct parameters {
   char custom_bcnd[MAXLEN];
   char outdir[MAXLEN];
   char indir[MAXLEN];  // Folder to load Initial conditions from
-  Real rho;
-  Real vx;
-  Real vy;
-  Real vz;
-  Real P;
-  Real A;
-  Real Bx = 0;
-  Real By = 0;
-  Real Bz = 0;
-  Real rho_l;
-  Real vx_l;
-  Real vy_l = 0;
-  Real vz_l = 0;
-  Real P_l;
-  Real Bx_l;
-  Real By_l;
-  Real Bz_l;
-  Real rho_r;
-  Real vx_r;
-  Real vy_r = 0;
-  Real vz_r = 0;
-  Real P_r;
-  Real Bx_r;
-  Real By_r;
-  Real Bz_r;
-  Real diaph;
+  Real rho                 = 0;
+  Real vx                  = 0;
+  Real vy                  = 0;
+  Real vz                  = 0;
+  Real P                   = 0;
+  Real A                   = 0;
+  Real Bx                  = 0;
+  Real By                  = 0;
+  Real Bz                  = 0;
+  Real rho_l               = 0;
+  Real vx_l                = 0;
+  Real vy_l                = 0;
+  Real vz_l                = 0;
+  Real P_l                 = 0;
+  Real Bx_l                = 0;
+  Real By_l                = 0;
+  Real Bz_l                = 0;
+  Real rho_r               = 0;
+  Real vx_r                = 0;
+  Real vy_r                = 0;
+  Real vz_r                = 0;
+  Real P_r                 = 0;
+  Real Bx_r                = 0;
+  Real By_r                = 0;
+  Real Bz_r                = 0;
+  Real diaph               = 0;
   Real rEigenVec_rho       = 0;
   Real rEigenVec_MomentumX = 0;
   Real rEigenVec_MomentumY = 0;
@@ -266,6 +262,10 @@ struct parameters {
   Real rEigenVec_Bz        = 0;
   Real pitch               = 0;
   Real yaw                 = 0;
+  Real polarization        = 0;
+  Real radius              = 0;
+  Real P_blast             = 0;
+  Real wave_length         = 1.0;
 #ifdef PARTICLES
   // The random seed for particle simulations. With the default of 0 then a
   // machine dependent seed will be generated.
@@ -326,8 +326,7 @@ struct parameters {
 
 /*! \fn void parse_params(char *param_file, struct parameters * parms);
  *  \brief Reads the parameters in the given file into a structure. */
-extern void parse_params(char *param_file, struct parameters *parms, int argc,
-                         char **argv);
+extern void parse_params(char *param_file, struct parameters *parms, int argc, char **argv);
 
 /*! \fn int is_param_valid(char *name);
  * \brief Verifies that a param is valid (even if not needed).  Avoids

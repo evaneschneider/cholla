@@ -71,8 +71,7 @@ class InputParser
    */
   bool cmdOptionExists(const std::string &option) const
   {
-    return std::find(this->_tokens.begin(), this->_tokens.end(), option) !=
-           this->_tokens.end();
+    return std::find(this->_tokens.begin(), this->_tokens.end(), option) != this->_tokens.end();
   }
   // =====================================================================
 
@@ -86,8 +85,9 @@ class InputParser
    */
   InputParser(int &argc, char **argv)
   {
-    for (int i = 1; i < argc; ++i)
-      this->_tokens.push_back(std::string(argv[i]));
+    for (int i = 1; i < argc; ++i) {
+      this->_tokens.emplace_back(argv[i]);
+    }
   }
   ~InputParser() = default;
   // =====================================================================
@@ -128,17 +128,8 @@ int main(int argc, char **argv)
     globalMpiLauncher.init("mpirun -np");
   }
 
-  if (input.cmdOptionExists("--runCholla=false")) {
-    globalRunCholla = false;
-  } else {
-    globalRunCholla = true;
-  }
-
-  if (input.cmdOptionExists("--compareSystemTestResults=false")) {
-    globalCompareSystemTestResults = false;
-  } else {
-    globalCompareSystemTestResults = true;
-  }
+  globalRunCholla                = not input.cmdOptionExists("--runCholla=false");
+  globalCompareSystemTestResults = not input.cmdOptionExists("--compareSystemTestResults=false");
 
   // Run test and return result
   return RUN_ALL_TESTS();

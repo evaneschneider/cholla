@@ -34,43 +34,32 @@ class tMHDUpdateMagneticField3D : public ::testing::Test
    *
    */
   tMHDUpdateMagneticField3D()
-      : nx(3),
-        ny(nx),
-        nz(nx),
-        n_cells(nx * ny * nz),
-        dt(3.2),
-        dx(2.5),
-        dy(2.5),
-        dz(2.5),
+      : n_cells(nx * ny * nz),
         sourceGrid(n_cells * (grid_enum::num_fields)),
         destinationGrid(n_cells * (grid_enum::num_fields), -999.),
         ctElectricFields(n_cells * 3),
         fiducialData(n_cells * (grid_enum::num_fields), -999.),
-        dimGrid((n_cells + TPB - 1), 1, 1),
+        dimGrid((n_cells + TPB - 1) / TPB, 1, 1),
         dimBlock(TPB, 1, 1)
   {
     // Allocate device arrays
-    CudaSafeCall(
-        cudaMalloc(&dev_sourceGrid, sourceGrid.size() * sizeof(double)));
-    CudaSafeCall(cudaMalloc(&dev_destinationGrid,
-                            destinationGrid.size() * sizeof(double)));
-    CudaSafeCall(cudaMalloc(&dev_ctElectricFields,
-                            ctElectricFields.size() * sizeof(double)));
+    CudaSafeCall(cudaMalloc(&dev_sourceGrid, sourceGrid.size() * sizeof(double)));
+    CudaSafeCall(cudaMalloc(&dev_destinationGrid, destinationGrid.size() * sizeof(double)));
+    CudaSafeCall(cudaMalloc(&dev_ctElectricFields, ctElectricFields.size() * sizeof(double)));
 
     // Populate the grids with values where vector.at(i) = double(i). The
     // values chosen aren't that important, just that every cell has a unique
     // value
     std::iota(std::begin(sourceGrid), std::end(sourceGrid), 0.);
-    std::iota(std::begin(ctElectricFields), std::end(ctElectricFields),
-              sourceGrid.back() + 1);
+    std::iota(std::begin(ctElectricFields), std::end(ctElectricFields), sourceGrid.back() + 1);
   }
   ~tMHDUpdateMagneticField3D() = default;
 
  protected:
   // Initialize the test grid and other state variables
-  size_t const nx, ny, nz;
+  size_t const nx = 3, ny = nx, nz = nx;
   size_t const n_cells;
-  Real const dt, dx, dy, dz;
+  Real const dt = 3.2, dx = 2.5, dy = dx, dz = dx;
 
   // Launch Parameters
   dim3 const dimGrid;   // How many blocks in the grid
@@ -84,8 +73,7 @@ class tMHDUpdateMagneticField3D : public ::testing::Test
   std::vector<double> fiducialData;
 
   // device pointers
-  double *dev_sourceGrid, *dev_destinationGrid, *dev_ctElectricFields,
-      *dev_fiducialData;
+  double *dev_sourceGrid, *dev_destinationGrid, *dev_ctElectricFields, *dev_fiducialData;
 
   /*!
    * \brief Launch the kernel and check results
@@ -94,26 +82,20 @@ class tMHDUpdateMagneticField3D : public ::testing::Test
   void runTest()
   {
     // Copy values to GPU
-    CudaSafeCall(cudaMemcpy(dev_sourceGrid, sourceGrid.data(),
-                            sourceGrid.size() * sizeof(Real),
+    CudaSafeCall(
+        cudaMemcpy(dev_sourceGrid, sourceGrid.data(), sourceGrid.size() * sizeof(Real), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(dev_destinationGrid, destinationGrid.data(), destinationGrid.size() * sizeof(Real),
                             cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(dev_destinationGrid, destinationGrid.data(),
-                            destinationGrid.size() * sizeof(Real),
-                            cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(dev_ctElectricFields, ctElectricFields.data(),
-                            ctElectricFields.size() * sizeof(Real),
+    CudaSafeCall(cudaMemcpy(dev_ctElectricFields, ctElectricFields.data(), ctElectricFields.size() * sizeof(Real),
                             cudaMemcpyHostToDevice));
 
     // Call the kernel to test
-    hipLaunchKernelGGL(mhd::Update_Magnetic_Field_3D, dimGrid, dimBlock, 0, 0,
-                       dev_sourceGrid, dev_destinationGrid,
-                       dev_ctElectricFields, nx, ny, nz, n_cells, dt, dx, dy,
-                       dz);
+    hipLaunchKernelGGL(mhd::Update_Magnetic_Field_3D, dimGrid, dimBlock, 0, 0, dev_sourceGrid, dev_destinationGrid,
+                       dev_ctElectricFields, nx, ny, nz, n_cells, dt, dx, dy, dz);
     CudaCheckError();
 
     // Copy test data back
-    CudaSafeCall(cudaMemcpy(destinationGrid.data(), dev_destinationGrid,
-                            destinationGrid.size() * sizeof(Real),
+    CudaSafeCall(cudaMemcpy(destinationGrid.data(), dev_destinationGrid, destinationGrid.size() * sizeof(Real),
                             cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
 
@@ -122,10 +104,8 @@ class tMHDUpdateMagneticField3D : public ::testing::Test
       int xid, yid, zid;
       cuda_utilities::compute3DIndices(i, nx, ny, xid, yid, zid);
       testingUtilities::checkResults(fiducialData.at(i), destinationGrid.at(i),
-                                     "value at i = " + std::to_string(i) +
-                                         ", xid  = " + std::to_string(xid) +
-                                         ", yid  = " + std::to_string(yid) +
-                                         ", zid  = " + std::to_string(zid));
+                                     "value at i = " + std::to_string(i) + ", xid  = " + std::to_string(xid) +
+                                         ", yid  = " + std::to_string(yid) + ", zid  = " + std::to_string(zid));
     }
   }
 };
@@ -135,9 +115,9 @@ class tMHDUpdateMagneticField3D : public ::testing::Test
 TEST_F(tMHDUpdateMagneticField3D, CorrectInputExpectCorrectOutput)
 {
   // Fiducial values
-  fiducialData.at(135) = 142.68000000000001;
-  fiducialData.at(162) = 151.75999999999999;
-  fiducialData.at(189) = 191.56;
+  fiducialData.at(148) = 155.68000000000001;
+  fiducialData.at(175) = 164.75999999999999;
+  fiducialData.at(202) = 204.56;
 
   // Launch kernel and check results
   runTest();

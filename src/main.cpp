@@ -79,11 +79,23 @@ int main(int argc, char *argv[])
   chprintf(
       "Parameter values:  nx = %d, ny = %d, nz = %d, tout = %f, init = %s, "
       "boundaries = %d %d %d %d %d %d\n",
-      P.nx, P.ny, P.nz, P.tout, P.init, P.xl_bcnd, P.xu_bcnd, P.yl_bcnd,
-      P.yu_bcnd, P.zl_bcnd, P.zu_bcnd);
-  if (strcmp(P.init, "Read_Grid") == 0)
+      P.nx, P.ny, P.nz, P.tout, P.init, P.xl_bcnd, P.xu_bcnd, P.yl_bcnd, P.yu_bcnd, P.zl_bcnd, P.zu_bcnd);
+
+  bool is_restart = false;
+  if (strcmp(P.init, "Read_Grid") == 0) {
+    is_restart = true;
+  }
+  if (strcmp(P.init, "Read_Grid_Cat") == 0) {
+    is_restart = true;
+  }
+
+  if (is_restart) {
     chprintf("Input directory:  %s\n", P.indir);
+  }
   chprintf("Output directory:  %s\n", P.outdir);
+
+  // Check the configuration
+  Check_Configuration(P);
 
   // Create a Log file to output run-time messages and output the git hash and
   // macro flags used
@@ -95,28 +107,24 @@ int main(int argc, char *argv[])
 
   // initialize the grid
   G.Initialize(&P);
-  chprintf("Local number of grid cells: %d %d %d %d\n", G.H.nx_real,
-           G.H.ny_real, G.H.nz_real, G.H.n_cells);
+  chprintf("Local number of grid cells: %d %d %d %d\n", G.H.nx_real, G.H.ny_real, G.H.nz_real, G.H.n_cells);
 
   message = "Initializing Simulation";
   Write_Message_To_Log_File(message.c_str());
 
-  // Set initial conditions and calculate first dt
+  // Set initial conditions
   chprintf("Setting initial conditions...\n");
   G.Set_Initial_Conditions(P);
   chprintf("Initial conditions set.\n");
-  // set main variables for Read_Grid initial conditions
-  if (strcmp(P.init, "Read_Grid") == 0) {
-    dti = C_cfl / G.H.dt;
+  // set main variables for Read_Grid and Read_Grid_Cat initial conditions
+  if (is_restart) {
     outtime += G.H.t;
     nfile = P.nfile;
   }
 
 #ifdef DE
-  chprintf("\nUsing Dual Energy Formalism:\n eta_1: %0.3f   eta_2: %0.4f\n",
-           DE_ETA_1, DE_ETA_2);
-  message = " eta_1: " + std::to_string(DE_ETA_1) +
-            "   eta_2: " + std::to_string(DE_ETA_2);
+  chprintf("\nUsing Dual Energy Formalism:\n eta_1: %0.3f   eta_2: %0.4f\n", DE_ETA_1, DE_ETA_2);
+  message = " eta_1: " + std::to_string(DE_ETA_1) + "   eta_2: " + std::to_string(DE_ETA_2);
   Write_Message_To_Log_File(message.c_str());
 #endif
 
@@ -146,7 +154,9 @@ int main(int argc, char *argv[])
 
 #ifdef ANALYSIS
   G.Initialize_Analysis_Module(&P);
-  if (G.Analysis.Output_Now) G.Compute_and_Output_Analysis(&P);
+  if (G.Analysis.Output_Now) {
+    G.Compute_and_Output_Analysis(&P);
+  }
 #endif
 
 #if defined(SUPERNOVA) && defined(PARTICLE_AGE)
@@ -186,14 +196,12 @@ int main(int argc, char *argv[])
   G.Get_Particles_Acceleration();
 #endif
 
-  chprintf("Dimensions of each cell: dx = %f dy = %f dz = %f\n", G.H.dx, G.H.dy,
-           G.H.dz);
+  chprintf("Dimensions of each cell: dx = %f dy = %f dz = %f\n", G.H.dx, G.H.dy, G.H.dz);
   chprintf("Ratio of specific heats gamma = %f\n", gama);
-  chprintf("Nstep = %d  Timestep = %f  Simulation time = %f\n", G.H.n_step,
-           G.H.dt, G.H.t);
+  chprintf("Nstep = %d  Simulation time = %f\n", G.H.n_step, G.H.t);
 
 #ifdef OUTPUT
-  if (strcmp(P.init, "Read_Grid") != 0 || G.H.Output_Now) {
+  if (!is_restart || G.H.Output_Now) {
     // write the initial conditions to file
     chprintf("Writing initial conditions to file...\n");
     WriteData(G, P, nfile);
@@ -217,8 +225,7 @@ int main(int argc, char *argv[])
   init_min = ReduceRealMin(init);
   init_max = ReduceRealMax(init);
   init_avg = ReduceRealAvg(init);
-  chprintf("Init  min: %9.4f  max: %9.4f  avg: %9.4f\n", init_min, init_max,
-           init_avg);
+  chprintf("Init  min: %9.4f  max: %9.4f  avg: %9.4f\n", init_min, init_max, init_avg);
   #else
   printf("Init %9.4f\n", init);
   #endif  // MPI_CHOLLA
@@ -228,6 +235,10 @@ int main(int argc, char *argv[])
   chprintf("Starting calculations.\n");
   message = "Starting calculations.";
   Write_Message_To_Log_File(message.c_str());
+
+  // Compute inverse timestep for the first time
+  dti = G.Calc_Inverse_Timestep();
+
   while (G.H.t < P.tout) {
 // get the start time
 #ifdef CPU_TIME
@@ -235,12 +246,12 @@ int main(int argc, char *argv[])
 #endif  // CPU_TIME
     start_step = get_time();
 
-    // calculate the timestep. Note: this computes the timestep ONLY on the
-    // first loop, on subsequent time steps it just calls the MPI_Allreduce to
-    // determine the global timestep
+    // calculate the timestep by calling MPI_Allreduce
     G.set_dt(dti);
 
-    if (G.H.t + G.H.dt > outtime) G.H.dt = outtime - G.H.t;
+    if (G.H.t + G.H.dt > outtime) {
+      G.H.dt = outtime - G.H.t;
+    }
 
 #if defined(SUPERNOVA) && defined(PARTICLE_AGE)
     supernova::Cluster_Feedback(G, sn_analysis);
@@ -310,7 +321,9 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef ANALYSIS
-    if (G.Analysis.Output_Now) G.Compute_and_Output_Analysis(&P);
+    if (G.Analysis.Output_Now) {
+      G.Compute_and_Output_Analysis(&P);
+    }
   #if defined(SUPERNOVA) && defined(PARTICLE_AGE)
     sn_analysis.Compute_Gas_Velocity_Dispersion(G);
   #endif

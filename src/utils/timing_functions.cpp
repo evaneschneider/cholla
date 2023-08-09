@@ -1,12 +1,11 @@
-
+#include "../utils/timing_functions.h"
 #ifdef CPU_TIME
-
-  #include "../utils/timing_functions.h"
 
   #include <fstream>
   #include <iostream>
   #include <string>
 
+  #include "../global/global.h"
   #include "../io/io.h"
 
   #ifdef MPI_CHOLLA
@@ -15,7 +14,10 @@
 
 void OneTime::Start()
 {
-  if (inactive) return;
+  cudaDeviceSynchronize();
+  if (inactive) {
+    return;
+  }
   time_start = get_time();
 }
 
@@ -28,7 +30,10 @@ void OneTime::Subtract(Real time_to_subtract)
 
 void OneTime::End()
 {
-  if (inactive) return;
+  cudaDeviceSynchronize();
+  if (inactive) {
+    return;
+  }
   Real time_end = get_time();
   Real time     = (time_end - time_start) * 1000;
 
@@ -41,7 +46,9 @@ void OneTime::End()
   t_max = time;
   t_avg = time;
   #endif
-  if (n_steps > 0) t_all += t_max;
+  if (n_steps > 0) {
+    t_all += t_max;
+  }
   n_steps++;
 }
 
@@ -57,26 +64,25 @@ void OneTime::RecordTime(Real time)
   t_max = time;
   t_avg = time;
   #endif
-  if (n_steps > 0) t_all += t_max;
+  if (n_steps > 0) {
+    t_all += t_max;
+  }
   n_steps++;
 }
 
 void OneTime::PrintStep()
 {
-  chprintf(" Time %-19s min: %9.4f  max: %9.4f  avg: %9.4f   ms\n", name, t_min,
-           t_max, t_avg);
+  chprintf(" Time %-19s min: %9.4f  max: %9.4f  avg: %9.4f   ms\n", name, t_min, t_max, t_avg);
 }
 
 void OneTime::PrintAverage()
 {
-  if (n_steps > 1)
+  if (n_steps > 1) {
     chprintf(" Time %-19s avg: %9.4f   ms\n", name, t_all / (n_steps - 1));
+  }
 }
 
-void OneTime::PrintAll()
-{
-  chprintf(" Time %-19s all: %9.4f   ms\n", name, t_all);
-}
+void OneTime::PrintAll() { chprintf(" Time %-19s all: %9.4f   ms\n", name, t_all); }
 
 Time::Time(void) {}
 
@@ -92,6 +98,7 @@ void Time::Initialize()
   #ifdef PARTICLES
       &(Calc_dt = OneTime("Calc_dt")),
   #endif
+      &(Hydro_Integrator = OneTime("Hydro_Integrator")),
       &(Hydro = OneTime("Hydro")),
       &(Boundaries = OneTime("Boundaries")),
   #ifdef GRAVITY
@@ -105,8 +112,11 @@ void Time::Initialize()
       &(Advance_Part_1 = OneTime("Advance_Part_1")),
       &(Advance_Part_2 = OneTime("Advance_Part_2")),
   #endif
+  #ifdef COOLING_GPU
+      &(Cooling_GPU = OneTime("Cooling_GPU")),
+  #endif
   #ifdef COOLING_GRACKLE
-      &(Cooling = OneTime("Cooling")),
+      &(Cooling_Grackle = OneTime("Cooling_Grackle")),
   #endif
   #ifdef CHEMISTRY_GPU
       &(Chemistry = OneTime("Chemistry")),
@@ -144,10 +154,8 @@ void Time::Print_Average_Times(struct parameters P)
 
   chprintf("Writing timing values to file: %s  \n", file_name.c_str());
 
-  std::string gitHash =
-      "Git Commit Hash = " + std::string(GIT_HASH) + std::string("\n");
-  std::string macroFlags =
-      "Macro Flags     = " + std::string(MACRO_FLAGS) + std::string("\n\n");
+  std::string gitHash    = "Git Commit Hash = " + std::string(GIT_HASH) + std::string("\n");
+  std::string macroFlags = "Macro Flags     = " + std::string(MACRO_FLAGS) + std::string("\n\n");
 
   header = "#n_proc  nx  ny  nz  n_omp  n_steps  ";
 
@@ -168,7 +176,9 @@ void Time::Print_Average_Times(struct parameters P)
   }
 
   #ifdef MPI_CHOLLA
-  if (procID != 0) return;
+  if (procID != 0) {
+    return;
+  }
   #endif
 
   std::ofstream out_file;
@@ -203,4 +213,30 @@ void Time::Print_Average_Times(struct parameters P)
   chprintf("Saved Timing: %s \n\n", file_name.c_str());
 }
 
+#endif  // CPU_TIME
+
+ScopedTimer::ScopedTimer(const char* input_name)
+{
+#ifdef CPU_TIME
+  name       = input_name;
+  time_start = get_time();
 #endif
+}
+
+ScopedTimer::~ScopedTimer(void)
+{
+#ifdef CPU_TIME
+  double time_elapsed_ms = (get_time() - time_start) * 1000;
+
+  #ifdef MPI_CHOLLA
+  double t_min = ReduceRealMin(time_elapsed_ms);
+  double t_max = ReduceRealMax(time_elapsed_ms);
+  double t_avg = ReduceRealAvg(time_elapsed_ms);
+  #else
+  double t_min = time_elapsed_ms;
+  double t_max = time_elapsed_ms;
+  double t_avg = time_elapsed_ms;
+  #endif  // MPI_CHOLLA
+  chprintf("ScopedTimer Min: %9.4f ms Max: %9.4f ms Avg: %9.4f ms %s \n", t_min, t_max, t_avg, name);
+#endif  // CPU_TIME
+}

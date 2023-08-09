@@ -54,6 +54,8 @@ setupTests ()
     return 1
   fi
 
+  builtin cd $CHOLLA_ROOT
+
   # Determine the hostname then use that to pick the right machine name and launch
   # command
   if [[ -n ${CHOLLA_MACHINE+x} ]]; then
@@ -93,10 +95,6 @@ setupTests ()
       return 1
       ;;
   esac
-
-  # Clean the cholla directory
-  builtin cd $CHOLLA_ROOT
-  make clobber
 
   # Source the setup file
   source "${CHOLLA_ROOT}/builds/setup.${CHOLLA_MACHINE}${CHOLLA_COMPILER}.sh"
@@ -214,6 +212,7 @@ runTests ()
 # argument is the value of COMPILER which does not occur for all setup scripts
 # \param[in] -g (optional) If set then download and build a local version of
 # GoogleTest to use instead of the machine default
+# \param[in] -d (optional) Build Cholla in debug mode
 buildAndRunTests ()
 {
   # Unset BUILD_GTEST so that subsequent runs aren't tied to what previous runs
@@ -249,8 +248,18 @@ buildAndRunTests ()
     esac
   done
 
+  # Run setup and check if it worked
+  setupTests $MAKE_TYPE_ARG $COMPILER_ARG
+  if [ $? -ne 0 ]; then
+    echo "setup failed"
+    exit 1
+  fi
+
+  # Clean the cholla directory
+  builtin cd $CHOLLA_ROOT
+  make clobber
+
   # Now we get to setting up and building
-  setupTests $MAKE_TYPE_ARG $COMPILER_ARG && \
   if [[ -n $BUILD_GTEST ]]; then
     buildGoogleTest
   fi
