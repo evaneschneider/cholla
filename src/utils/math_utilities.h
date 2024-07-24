@@ -16,6 +16,7 @@
 // Local Includes
 #include "../global/global.h"
 #include "../global/global_cuda.h"
+#include "../utils/basic_structs.h"
 #include "../utils/gpu.hpp"
 
 namespace math_utils
@@ -81,5 +82,51 @@ inline __device__ __host__ Real dotProduct(Real const &a1, Real const &a2, Real 
   return a1 * b1 + ((a2 * b2) + (a3 * b3));
 };
 // =========================================================================
+
+// =========================================================================
+/*!
+ * \brief Compute the magnitude of a vector
+ *
+ * \param[in] v1 The first element of the vector
+ * \param[in] v2 The second element of the vector
+ * \param[in] v3 The third element of the vector
+ *
+ * \return Real The dot product of a and b
+ */
+inline __device__ __host__ Real SquareMagnitude(Real const &v1, Real const &v2, Real const &v3)
+{
+  return dotProduct(v1, v2, v3, v1, v2, v3);
+};
+// =========================================================================
+
+// =====================================================================================================================
+/*!
+ * \brief Cyclically permute a Vector once. i.e. (x,y,z) becomes (y,z,x)
+ *
+ * \param[in,out] vec The vector to permute
+ */
+inline __device__ __host__ void Cyclic_Permute_Once(hydro_utilities::VectorXYZ &vec)
+{
+  Real temp = vec.x();
+  vec.x()   = vec.y();
+  vec.y()   = vec.z();
+  vec.z()   = temp;
+}
+// =====================================================================================================================
+
+// =====================================================================================================================
+/*!
+ * \brief Cyclically permute a Vector twice. i.e. (x,y,z) becomes (z,x,y)
+ *
+ * \param[in,out] vec The vector to permute
+ */
+inline __device__ __host__ void Cyclic_Permute_Twice(hydro_utilities::VectorXYZ &vec)
+{
+  Real temp = vec.y();
+  vec.y()   = vec.x();
+  vec.x()   = vec.z();
+  vec.z()   = temp;
+}
+// =====================================================================================================================
 
 }  // namespace math_utils

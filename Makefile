@@ -9,16 +9,10 @@ include builds/make.type.$(TYPE)
 # CUDA_ARCH defaults to sm_70 if not set in make.host
 CUDA_ARCH ?= sm_70
 
-DIRS     := src src/analysis src/chemistry_gpu src/cooling src/cooling_grackle src/cosmology \
-            src/cpu src/global src/gravity src/gravity/paris src/grid src/hydro \
-            src/integrators src/io src/main.cpp src/main_tests.cpp src/mhd\
-            src/model src/mpi src/old_cholla src/particles src/reconstruction \
-            src/riemann_solvers src/system_tests src/utils src/dust
-
 SUFFIX ?= .$(TYPE).$(MACHINE)
 
-CPPFILES := $(foreach DIR,$(DIRS),$(wildcard $(DIR)/*.cpp))
-GPUFILES := $(foreach DIR,$(DIRS),$(wildcard $(DIR)/*.cu))
+CPPFILES := $(shell find src/ -type f -name '*.cpp')
+GPUFILES := $(shell find src/ -type f -name '*.cu')
 
 # Build a list of all potential object files so cleaning works properly
 CLEAN_OBJS := $(subst .cpp,.o,$(CPPFILES)) \
@@ -54,6 +48,10 @@ else
   CPPFILES := $(filter-out src/system_tests/% %_tests.cpp,$(CPPFILES))
   CPPFILES := $(filter-out src/utils/testing_utilities.cpp,$(CPPFILES))
   GPUFILES := $(filter-out src/system_tests/% %_tests.cu,$(GPUFILES))
+endif
+
+ifeq ($(COVERAGE), true)
+  CXXFLAGS += --coverage
 endif
 
 OBJS     := $(subst .cpp,.o,$(CPPFILES)) \
@@ -97,7 +95,7 @@ ifeq ($(findstring -DPARIS,$(DFLAGS)),-DPARIS)
   endif
 endif
 
-ifeq ($(findstring -DSUPERNOVA,$(DFLAGS)),-DSUPERNOVA)
+ifeq ($(findstring -DFEEDBACK,$(DFLAGS)),-DFEEDBACK)
     ifdef HIPCONFIG
 	CXXFLAGS += -I$(ROCM_PATH)/include/hiprand -I$(ROCM_PATH)/hiprand/include
 	GPUFLAGS += -I$(ROCM_PATH)/include/hiprand -I$(ROCM_PATH)/hiprand/include
@@ -172,10 +170,11 @@ DFLAGS      += $(MACRO_FLAGS)
 
 # Setup variables for clang-tidy
 LIBS_CLANG_TIDY     := $(subst -I/, -isystem /,$(LIBS))
-LIBS_CLANG_TIDY     += -isystem $(MPI_ROOT)/include
+# This tells clang-tidy that the path after each -isystem command is a system library so that it can be easily ignored by the header filter regex
+LIBS_CLANG_TIDY     += -isystem $(MPI_ROOT)/include -isystem $(HDF5_ROOT)/include
 CXXFLAGS_CLANG_TIDY := $(subst -I/, -isystem /,$(LDFLAGS))
 GPUFLAGS_CLANG_TIDY := $(subst -I/, -isystem /,$(GPUFLAGS))
-GPUFLAGS_CLANG_TIDY := $(filter-out -ccbin=mpicxx -fmad=false --expt-extended-lambda,$(GPUFLAGS))
+GPUFLAGS_CLANG_TIDY := $(filter-out -ccbin=mpicxx -fmad=false --expt-extended-lambda,$(GPUFLAGS_CLANG_TIDY))
 GPUFLAGS_CLANG_TIDY += --cuda-host-only --cuda-path=$(CUDA_ROOT) -isystem /clang/includes
 CPPFILES_TIDY := $(CPPFILES)
 GPUFILES_TIDY := $(GPUFILES)
@@ -214,6 +213,8 @@ clean:
 	rm -f $(CLEAN_OBJS)
 	rm -rf googletest
 	-find bin/ -type f -executable -name "cholla.*.$(MACHINE)*" -exec rm -f '{}' \;
+	-find src/ -type f -name "*.gcno" -delete
+	-find src/ -type f -name "*.gcda" -delete
 
 clobber: clean
 	-find bin/ -type f -executable -name "cholla*" -exec rm -f '{}' \;

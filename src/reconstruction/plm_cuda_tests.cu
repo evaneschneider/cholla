@@ -1,6 +1,6 @@
 /*!
- * \file plmc_cuda_tests.cu
- * \brief Tests for the contents of plmc_cuda.h and plmc_cuda.cu
+ * \file plm_cuda_tests.cu
+ * \brief Tests for the contents of plm_cuda.h and plm_cuda.cu
  *
  */
 
@@ -18,13 +18,19 @@
 
 #include "../global/global.h"
 #include "../io/io.h"
-#include "../reconstruction/plmc_cuda.h"
+#include "../reconstruction/plm_cuda.h"
 #include "../utils/DeviceVector.h"
 #include "../utils/hydro_utilities.h"
 #include "../utils/testing_utilities.h"
 
-TEST(tHYDROPlmcReconstructor, CorrectInputExpectCorrectOutput)
+TEST(tHYDROPlmReconstructor, CorrectInputExpectCorrectOutput)
 {
+#ifndef VL
+  std::cerr << "Warning: The tHYDROPlmReconstructor.CorrectInputExpectCorrectOutput test only supports the Van Leer "
+               "(VL) integrator"
+            << std::endl;
+  return;
+#endif  // VL
   // Set up PRNG to use
   std::mt19937_64 prng(42);
   std::uniform_real_distribution<double> doubleRand(0.1, 5);
@@ -49,45 +55,46 @@ TEST(tHYDROPlmcReconstructor, CorrectInputExpectCorrectOutput)
   dev_grid.cpyHostToDevice(host_grid);
 
   // Fiducial Data
-  std::vector<std::unordered_map<int, double>> fiducial_interface_left  = {{{26, 2.1584359129984056},
-                                                                            {27, 0.70033864721549188},
-                                                                            {106, 2.2476363309467553},
-                                                                            {107, 3.0633780053857027},
-                                                                            {186, 2.2245934101106259},
-                                                                            {187, 2.1015872413794123},
-                                                                            {266, 2.1263341057778309},
-                                                                            {267, 3.9675148506537838},
-                                                                            {346, 3.3640057502842691},
-                                                                            {347, 21.091316282933843}},
-                                                                           {{21, 0.72430827309279655},
-                                                                            {37, 0.19457128219588618},
-                                                                            {101, 5.4739527659741896},
-                                                                            {117, 4.4286255636679313},
-                                                                            {181, 0.12703829036056602},
-                                                                            {197, 2.2851440769830953},
-                                                                            {261, 1.5337035731959561},
-                                                                            {277, 2.697375839048191},
-                                                                            {341, 22.319601655044117},
-                                                                            {357, 82.515887983144168}},
-                                                                           {{25, 2.2863650183226212},
-                                                                            {29, 1.686415421301841},
-                                                                            {105, 0.72340346106443465},
-                                                                            {109, 5.4713687086831388},
-                                                                            {185, 3.929100145230096},
-                                                                            {189, 4.9166140516911483},
-                                                                            {265, 0.95177493689267167},
-                                                                            {269, 0.46056494878491938},
-                                                                            {345, 3.6886096301452787},
-                                                                            {349, 16.105488797582133}}};
+  std::vector<std::unordered_map<int, double>> fiducial_interface_left = {{{26, 3.8877922383184833},
+                                                                           {27, 0.70033864721549188},
+                                                                           {106, 5.6625525038177784},
+                                                                           {107, 3.0633780053857027},
+                                                                           {186, 4.0069556576401011},
+                                                                           {187, 2.1015872413794123},
+                                                                           {266, 5.1729859852329314},
+                                                                           {267, 3.9675148506537838},
+                                                                           {346, 9.6301414677176531},
+                                                                           {347, 21.091316282933843}},
+                                                                          {{21, 0.74780807318015607},
+                                                                           {37, 0.19457128219588618},
+                                                                           {101, 5.6515522777659895},
+                                                                           {117, 4.4286255636679313},
+                                                                           {181, 0.13115998072061905},
+                                                                           {197, 2.2851440769830953},
+                                                                           {261, 1.5834637771067519},
+                                                                           {277, 2.697375839048191},
+                                                                           {341, 23.043749364531674},
+                                                                           {357, 82.515887983144168}},
+                                                                          {{25, 2.2863650183226212},
+                                                                           {29, 1.686415421301841},
+                                                                           {105, 0.72340346106443465},
+                                                                           {109, 5.9563546443402542},
+                                                                           {185, 3.6128571662018358},
+                                                                           {189, 5.3735653401079038},
+                                                                           {265, 0.95177493689267167},
+                                                                           {269, 0.46056494878491938},
+                                                                           {345, 3.1670194578067843},
+                                                                           {349, 19.142817472509272}}};
+
   std::vector<std::unordered_map<int, double>> fiducial_interface_right = {{{25, 3.8877922383184833},
                                                                             {26, 0.70033864721549188},
-                                                                            {105, 1.5947787943675635},
+                                                                            {105, 1.594778794367564},
                                                                             {106, 3.0633780053857027},
                                                                             {185, 4.0069556576401011},
                                                                             {186, 2.1015872413794123},
-                                                                            {265, 1.7883678016935785},
+                                                                            {265, 1.7883678016935782},
                                                                             {266, 3.9675148506537838},
-                                                                            {345, 2.8032969746372527},
+                                                                            {345, 2.8032969746372531},
                                                                             {346, 21.091316282933843}},
                                                                            {{17, 0.43265217076853835},
                                                                             {33, 0.19457128219588618},
@@ -102,13 +109,28 @@ TEST(tHYDROPlmcReconstructor, CorrectInputExpectCorrectOutput)
                                                                            {{5, 2.2863650183226212},
                                                                             {9, 1.686415421301841},
                                                                             {85, 0.72340346106443465},
-                                                                            {89, 1.7792505446336098},
+                                                                            {89, 1.77925054463361},
                                                                             {165, 5.3997753452111859},
-                                                                            {169, 1.4379190463124139},
+                                                                            {169, 1.4379190463124141},
                                                                             {245, 0.95177493689267167},
                                                                             {249, 0.46056494878491938},
-                                                                            {325, 6.6889498465051407},
-                                                                            {329, 1.6145084086614281}}};
+                                                                            {325, 6.6889498465051398},
+                                                                            {329, 1.6145084086614285}}};
+
+#ifdef PLMP
+  // Change the fiducial data for the PLMP version of this test. Not all elements need to be changed
+  fiducial_interface_left.at(2)[29]  = 1.1600386335016277;
+  fiducial_interface_left.at(2)[109] = 4.0972120006692201;
+  fiducial_interface_left.at(2)[189] = 3.6963273197291162;
+  fiducial_interface_left.at(2)[269] = 0.31680991947688009;
+  fiducial_interface_left.at(2)[349] = 13.167815913968777;
+
+  fiducial_interface_right.at(2)[9]   = 2.2127922091020542;
+  fiducial_interface_right.at(2)[89]  = 2.3346037361106178;
+  fiducial_interface_right.at(2)[169] = 1.8867332584893817;
+  fiducial_interface_right.at(2)[249] = 0.60431997809295868;
+  fiducial_interface_right.at(2)[329] = 2.1184410336202282;
+#endif  // PLMP
 
   // Loop over different directions
   for (size_t direction = 0; direction < 3; direction++) {
@@ -137,10 +159,22 @@ TEST(tHYDROPlmcReconstructor, CorrectInputExpectCorrectOutput)
     cuda_utilities::DeviceVector<double> dev_interface_right(host_grid.size(), true);
 
     // Launch kernel
-    hipLaunchKernelGGL(PLMC_cuda, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
-                       dev_interface_right.data(), nx_rot, ny_rot, nz_rot, dx, dt, gamma, direction, n_fields);
-    CudaCheckError();
-    CHECK(cudaDeviceSynchronize());
+    switch (direction) {
+      case 0:
+        hipLaunchKernelGGL(PLM_cuda<0>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx_rot, ny_rot, nz_rot, dx, dt, gamma);
+        break;
+      case 1:
+        hipLaunchKernelGGL(PLM_cuda<1>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx_rot, ny_rot, nz_rot, dx, dt, gamma);
+        break;
+      case 2:
+        hipLaunchKernelGGL(PLM_cuda<2>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx_rot, ny_rot, nz_rot, dx, dt, gamma);
+        break;
+    }
+    GPU_Error_Check();
+    GPU_Error_Check(cudaDeviceSynchronize());
 
     // Perform Comparison
     for (size_t i = 0; i < host_grid.size(); i++) {
@@ -151,7 +185,7 @@ TEST(tHYDROPlmcReconstructor, CorrectInputExpectCorrectOutput)
               ? 0.0
               : fiducial_interface_left.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "left interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
 
@@ -161,14 +195,16 @@ TEST(tHYDROPlmcReconstructor, CorrectInputExpectCorrectOutput)
                          ? 0.0
                          : fiducial_interface_right.at(direction)[i];
 
-      testingUtilities::checkResults(
+      // if (test_val != 0.0) std::cout << "{" << i << ", " << to_string_exact(test_val) << "}," << std::endl;
+
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "right interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
     }
   }
 }
 
-TEST(tMHDPlmcReconstructor, CorrectInputExpectCorrectOutput)
+TEST(tMHDPlmReconstructor, CorrectInputExpectCorrectOutput)
 {
   // Set up PRNG to use
   std::mt19937_64 prng(42);
@@ -241,6 +277,39 @@ TEST(tMHDPlmcReconstructor, CorrectInputExpectCorrectOutput)
                                                                                {389, 1.9034519507895218},
                                                                            }};
 
+#ifdef PLMP
+  // Change the fiducial data for the PLMP version of this test. Not all elements need to be changed
+  fiducial_interface_left.at(1)[21]  = 0.74780807318015607;
+  fiducial_interface_left.at(1)[85]  = 2.7423587304689869;
+  fiducial_interface_left.at(1)[149] = 2.0740041194407692;
+  fiducial_interface_left.at(1)[213] = 1.2020911406758266;
+  fiducial_interface_left.at(1)[277] = 14.779549963507595;
+  fiducial_interface_left.at(1)[341] = 2.1583975283044725;
+  fiducial_interface_left.at(1)[405] = 1.7965456420437496;
+  fiducial_interface_left.at(2)[21]  = 0.2849255850177943;
+  fiducial_interface_left.at(2)[85]  = 2.2425026758932325;
+  fiducial_interface_left.at(2)[149] = 2.2953938046062077;
+  fiducial_interface_left.at(2)[213] = 0.57593655962650969;
+  fiducial_interface_left.at(2)[277] = 26.253543495427323;
+  fiducial_interface_left.at(2)[341] = 1.7033818819502551;
+  fiducial_interface_left.at(2)[405] = 1.9082633079592932;
+
+  fiducial_interface_right.at(1)[17]  = 0.43265217076853835;
+  fiducial_interface_right.at(1)[81]  = 2.8178764819733342;
+  fiducial_interface_right.at(1)[145] = 2.6588068794446604;
+  fiducial_interface_right.at(1)[209] = 0.69548238395352202;
+  fiducial_interface_right.at(1)[273] = 23.035559922784643;
+  fiducial_interface_right.at(1)[337] = 2.1583975283044725;
+  fiducial_interface_right.at(1)[401] = 1.6102181218567606;
+  fiducial_interface_right.at(2)[5]   = 0.89553465893090012;
+  fiducial_interface_right.at(2)[69]  = 2.068452470340659;
+  fiducial_interface_right.at(2)[133] = 0.77257393218171133;
+  fiducial_interface_right.at(2)[197] = 1.0689231838445987;
+  fiducial_interface_right.at(2)[261] = 7.3918889587333432;
+  fiducial_interface_right.at(2)[325] = 1.7033818819502551;
+  fiducial_interface_right.at(2)[389] = 1.8093240100745669;
+#endif  // PLMP
+
   // Loop over different directions
   for (size_t direction = 0; direction < 3; direction++) {
     // Allocate device buffers
@@ -248,10 +317,22 @@ TEST(tMHDPlmcReconstructor, CorrectInputExpectCorrectOutput)
     cuda_utilities::DeviceVector<double> dev_interface_right(n_cells_interface, true);
 
     // Launch kernel
-    hipLaunchKernelGGL(PLMC_cuda, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
-                       dev_interface_right.data(), nx, ny, nz, dx, dt, gamma, direction, n_fields);
-    CudaCheckError();
-    CHECK(cudaDeviceSynchronize());
+    switch (direction) {
+      case 0:
+        hipLaunchKernelGGL(PLM_cuda<0>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, dx, dt, gamma);
+        break;
+      case 1:
+        hipLaunchKernelGGL(PLM_cuda<1>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, dx, dt, gamma);
+        break;
+      case 2:
+        hipLaunchKernelGGL(PLM_cuda<2>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, dx, dt, gamma);
+        break;
+    }
+    GPU_Error_Check();
+    GPU_Error_Check(cudaDeviceSynchronize());
 
     // Perform Comparison
     for (size_t i = 0; i < dev_interface_right.size(); i++) {
@@ -262,7 +343,7 @@ TEST(tMHDPlmcReconstructor, CorrectInputExpectCorrectOutput)
               ? 0.0
               : fiducial_interface_left.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "left interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
 
@@ -272,7 +353,7 @@ TEST(tMHDPlmcReconstructor, CorrectInputExpectCorrectOutput)
                          ? 0.0
                          : fiducial_interface_right.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "right interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
     }

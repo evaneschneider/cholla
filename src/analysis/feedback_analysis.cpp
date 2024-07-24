@@ -7,17 +7,20 @@
   #include "../mpi/mpi_routines.h"
 #endif
 
-#define VRMS_CUTOFF_DENSITY (0.01 * 0.6 * MP / DENSITY_UNIT)
-
-FeedbackAnalysis::FeedbackAnalysis(Grid3D& G)
+FeedbackAnalysis::FeedbackAnalysis(Grid3D& G, struct Parameters* P)
 {
+  // set distance limits beyond which contributions to the V_rms don't
+  // make sense, such as too close to the simulation volume edge or
+  // too high above the disk.
+  r_max = P->xlen / 2 * 0.975;
+  z_max = 0.15;  // 150 pc above/below the disk plane
   // allocate arrays
   h_circ_vel_x = (Real*)malloc(G.H.n_cells * sizeof(Real));
   h_circ_vel_y = (Real*)malloc(G.H.n_cells * sizeof(Real));
 
 #ifdef PARTICLES_GPU
-  CHECK(cudaMalloc((void**)&d_circ_vel_x, G.H.n_cells * sizeof(Real)));
-  CHECK(cudaMalloc((void**)&d_circ_vel_y, G.H.n_cells * sizeof(Real)));
+  GPU_Error_Check(cudaMalloc((void**)&d_circ_vel_x, G.H.n_cells * sizeof(Real)));
+  GPU_Error_Check(cudaMalloc((void**)&d_circ_vel_y, G.H.n_cells * sizeof(Real)));
 #endif
 
   // setup the (constant) circular speed arrays
@@ -32,7 +35,7 @@ FeedbackAnalysis::FeedbackAnalysis(Grid3D& G)
         G.Get_Position(i, j, k, &x, &y, &z);
         r = sqrt(x * x + y * y);
 
-        vca              = sqrt(r * fabs(Galaxies::MW.gr_total_D3D(r, z)));
+        vca              = sqrt(r * fabs(galaxies::MW.gr_total_D3D(r, z)));
         h_circ_vel_x[id] = -y / r * vca;
         h_circ_vel_y[id] = x / r * vca;
       }
@@ -40,8 +43,8 @@ FeedbackAnalysis::FeedbackAnalysis(Grid3D& G)
   }
 
 #ifdef PARTICLES_GPU
-  CHECK(cudaMemcpy(d_circ_vel_x, h_circ_vel_x, G.H.n_cells * sizeof(Real), cudaMemcpyHostToDevice));
-  CHECK(cudaMemcpy(d_circ_vel_y, h_circ_vel_y, G.H.n_cells * sizeof(Real), cudaMemcpyHostToDevice));
+  GPU_Error_Check(cudaMemcpy(d_circ_vel_x, h_circ_vel_x, G.H.n_cells * sizeof(Real), cudaMemcpyHostToDevice));
+  GPU_Error_Check(cudaMemcpy(d_circ_vel_y, h_circ_vel_y, G.H.n_cells * sizeof(Real), cudaMemcpyHostToDevice));
 #endif
 }
 
@@ -50,8 +53,8 @@ FeedbackAnalysis::~FeedbackAnalysis()
   free(h_circ_vel_x);
   free(h_circ_vel_y);
 #ifdef PARTICLES_GPU
-  CHECK(cudaFree(d_circ_vel_x));
-  CHECK(cudaFree(d_circ_vel_y));
+  GPU_Error_Check(cudaFree(d_circ_vel_x));
+  GPU_Error_Check(cudaFree(d_circ_vel_y));
 #endif
 }
 
@@ -87,7 +90,7 @@ void FeedbackAnalysis::Compute_Gas_Velocity_Dispersion(Grid3D& G)
   #ifdef MPI_CHOLLA
   MPI_Allreduce(&partial_mass, &total_mass, 1, MPI_CHREAL, MPI_SUM, world);
   #else
-  total_mass         = partial_mass;
+  total_mass = partial_mass;
   #endif
 
   for (k = G.H.n_ghost; k < G.H.nz - G.H.n_ghost; k++) {
@@ -96,7 +99,7 @@ void FeedbackAnalysis::Compute_Gas_Velocity_Dispersion(Grid3D& G)
         id      = i + j * G.H.nx + k * G.H.nx * G.H.ny;
         id_grav = (i + ghost_diff) + (j + ghost_diff) * nx_grav + (k + ghost_diff) * nx_grav * ny_grav;
 
-        if (G.C.density[id] < VRMS_CUTOFF_DENSITY) continue;  // in cgs, this is 0.01 cm^{-3}
+        if (G.C.density[id] < FB_ANALYSIS_CUTOFF_DENSITY) continue;
 
         G.Get_Position(i, j, k, &x, &y, &z);
         r = sqrt(x * x + y * y);

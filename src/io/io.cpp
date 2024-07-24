@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -14,6 +15,9 @@
 #endif  // HDF5
 #include "../grid/grid3D.h"
 #include "../io/io.h"
+#include "../utils/cuda_utilities.h"
+#include "../utils/hydro_utilities.h"
+#include "../utils/mhd_utilities.h"
 #include "../utils/timing_functions.h"  // provides ScopedTimer
 #ifdef MPI_CHOLLA
   #include "../mpi/mpi_routines.h"
@@ -30,15 +34,14 @@
 
 /* function used to rotate points about an axis in 3D for the rotated projection
  * output routine */
-void rotate_point(Real x, Real y, Real z, Real delta, Real phi, Real theta, Real *xp, Real *yp, Real *zp);
+void Rotate_Point(Real x, Real y, Real z, Real delta, Real phi, Real theta, Real *xp, Real *yp, Real *zp);
 
-void Create_Log_File(struct parameters P)
+/* Generate the log output file */
+void Create_Log_File(struct Parameters P)
 {
-#ifdef MPI_CHOLLA
-  if (procID != 0) {
+  if (not Is_Root_Proc()) {
     return;
   }
-#endif
 
   std::string file_name(LOG_FILE_NAME);
   chprintf("\nCreating Log File: %s \n\n", file_name.c_str());
@@ -62,13 +65,12 @@ void Create_Log_File(struct parameters P)
   out_file.close();
 }
 
+/* Write an entry in the log output file */
 void Write_Message_To_Log_File(const char *message)
 {
-#ifdef MPI_CHOLLA
-  if (procID != 0) {
+  if (not Is_Root_Proc()) {
     return;
   }
-#endif
 
   std::string file_name(LOG_FILE_NAME);
   std::ofstream out_file;
@@ -78,11 +80,16 @@ void Write_Message_To_Log_File(const char *message)
 }
 
 /* Write Cholla Output Data */
-void WriteData(Grid3D &G, struct parameters P, int nfile)
+void Write_Data(Grid3D &G, struct Parameters P, int nfile)
 {
   cudaMemcpy(G.C.density, G.C.device, G.H.n_fields * G.H.n_cells * sizeof(Real), cudaMemcpyDeviceToHost);
 
   chprintf("\nSaving Snapshot: %d \n", nfile);
+
+  // ensure the output-directory exists (try to create it if it doesn't exist)
+  // -> Aside: it would be nice to pass an FnameTemplate instance into each function that uses it,
+  //    rather than reconstructing it everywhere
+  Ensure_Dir_Exists(FnameTemplate(P).effective_output_dir_path(nfile));
 
 #ifdef HDF5
   // Initialize HDF5 interface
@@ -104,38 +111,38 @@ void WriteData(Grid3D &G, struct parameters P, int nfile)
 #endif
 
 #ifdef COSMOLOGY
-  G.Change_Cosmological_Frame_Sytem(false);
+  G.Change_Cosmological_Frame_System(false);
 #endif
 
 #ifndef ONLY_PARTICLES
   /*call the data output routine for Hydro data*/
   if (nfile % P.n_hydro == 0) {
-    OutputData(G, P, nfile);
+    Output_Data(G, P, nfile);
   }
 #endif
 
 // This function does other checks to make sure it is valid (3D only)
 #ifdef HDF5
   if (P.n_out_float32 && nfile % P.n_out_float32 == 0) {
-    OutputFloat32(G, P, nfile);
+    Output_Float32(G, P, nfile);
   }
 #endif
 
 #ifdef PROJECTION
   if (nfile % P.n_projection == 0) {
-    OutputProjectedData(G, P, nfile);
+    Output_Projected_Data(G, P, nfile);
   }
 #endif /*PROJECTION*/
 
 #ifdef ROTATED_PROJECTION
   if (nfile % P.n_rotated_projection == 0) {
-    OutputRotatedProjectedData(G, P, nfile);
+    Output_Rotated_Projected_Data(G, P, nfile);
   }
 #endif /*ROTATED_PROJECTION*/
 
 #ifdef SLICES
   if (nfile % P.n_slice == 0) {
-    OutputSlices(G, P, nfile);
+    Output_Slices(G, P, nfile);
   }
 #endif /*SLICES*/
 
@@ -159,7 +166,7 @@ void WriteData(Grid3D &G, struct parameters P, int nfile)
   } else {
     chprintf(" Saved Snapshot: %d     z:%f\n", nfile, G.Cosmo.current_z);
   }
-  G.Change_Cosmological_Frame_Sytem(true);
+  G.Change_Cosmological_Frame_System(true);
   chprintf("\n");
   G.H.Output_Now = false;
 #endif
@@ -179,22 +186,13 @@ void WriteData(Grid3D &G, struct parameters P, int nfile)
 }
 
 /* Output the grid data to file. */
-void OutputData(Grid3D &G, struct parameters P, int nfile)
+void Output_Data(Grid3D &G, struct Parameters P, int nfile)
 {
   // create the filename
-  std::string filename(P.outdir);
-  filename += std::to_string(nfile);
+  std::string filename = FnameTemplate(P).format_fname(nfile, "");
 
-#if defined BINARY
-  filename += ".bin";
-#elif defined HDF5
-  filename += ".h5";
-#else
-  filename += ".txt";
+#if !defined(BINARY) && !defined(HDF5)
   if (G.H.nx * G.H.ny * G.H.nz > 1000) printf("Ascii outputs only recommended for small problems!\n");
-#endif
-#ifdef MPI_CHOLLA
-  filename += "." + std::to_string(procID);
 #endif
 
 // open the file for binary writes
@@ -257,7 +255,7 @@ void OutputData(Grid3D &G, struct parameters P, int nfile)
 #endif
 }
 
-void OutputFloat32(Grid3D &G, struct parameters P, int nfile)
+void Output_Float32(Grid3D &G, struct Parameters P, int nfile)
 {
 #ifdef HDF5
   Header H = G.H;
@@ -274,12 +272,7 @@ void OutputFloat32(Grid3D &G, struct parameters P, int nfile)
   }
 
   // create the filename
-  std::string filename(P.outdir);
-  filename += std::to_string(nfile);
-  filename += ".float32.h5";
-  #ifdef MPI_CHOLLA
-  filename += "." + std::to_string(procID);
-  #endif  // MPI_CHOLLA
+  std::string filename = FnameTemplate(P).format_fname(nfile, ".float32");
 
   // create hdf5 file
   hid_t file_id; /* file identifier */
@@ -315,29 +308,29 @@ void OutputFloat32(Grid3D &G, struct parameters P, int nfile)
     auto *dataset_buffer = (float *)malloc(buffer_size * sizeof(float));
 
     if (P.out_float32_density > 0) {
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_density, "/density");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_density, "/density");
     }
     if (P.out_float32_momentum_x > 0) {
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_momentum_x, "/momentum_x");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_momentum_x, "/momentum_x");
     }
     if (P.out_float32_momentum_y > 0) {
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_momentum_y, "/momentum_y");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_momentum_y, "/momentum_y");
     }
     if (P.out_float32_momentum_z > 0) {
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_momentum_z, "/momentum_z");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_momentum_z, "/momentum_z");
     }
     if (P.out_float32_Energy > 0) {
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_Energy, "/Energy");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_Energy, "/Energy");
     }
   #ifdef DE
     if (P.out_float32_GasEnergy > 0) {
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_GasEnergy, "/GasEnergy");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset, ny_dset, nz_dset, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_GasEnergy, "/GasEnergy");
     }
   #endif  // DE
   #ifdef MHD
@@ -345,18 +338,18 @@ void OutputFloat32(Grid3D &G, struct parameters P, int nfile)
     // TODO (by Alwin, for anyone) : Repair output format if needed and remove these chprintfs when appropriate
     if (P.out_float32_magnetic_x > 0) {
       chprintf("WARNING: MHD float-32 output has a different output format than float-64\n");
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset + 1, ny_dset + 1, nz_dset + 1, H.n_ghost - 1, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_magnetic_x, "/magnetic_x");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset + 1, ny_dset + 1, nz_dset + 1, H.n_ghost - 1, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_magnetic_x, "/magnetic_x");
     }
     if (P.out_float32_magnetic_y > 0) {
       chprintf("WARNING: MHD float-32 output has a different output format than float-64\n");
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset + 1, ny_dset + 1, nz_dset + 1, H.n_ghost - 1, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_magnetic_y, "/magnetic_y");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset + 1, ny_dset + 1, nz_dset + 1, H.n_ghost - 1, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_magnetic_y, "/magnetic_y");
     }
     if (P.out_float32_magnetic_z > 0) {
       chprintf("WARNING: MHD float-32 output has a different output format than float-64\n");
-      WriteHDF5Field3D(H.nx, H.ny, nx_dset + 1, ny_dset + 1, nz_dset + 1, H.n_ghost - 1, file_id, dataset_buffer,
-                       device_dataset_vector.data(), G.C.d_magnetic_z, "/magnetic_z");
+      Write_HDF5_Field_3D(H.nx, H.ny, nx_dset + 1, ny_dset + 1, nz_dset + 1, H.n_ghost - 1, file_id, dataset_buffer,
+                          device_dataset_vector.data(), G.C.d_magnetic_z, "/magnetic_z");
     }
 
   #endif  // MHD
@@ -375,20 +368,14 @@ void OutputFloat32(Grid3D &G, struct parameters P, int nfile)
 }
 
 /* Output a projection of the grid data to file. */
-void OutputProjectedData(Grid3D &G, struct parameters P, int nfile)
+void Output_Projected_Data(Grid3D &G, struct Parameters P, int nfile)
 {
 #ifdef HDF5
   hid_t file_id;
   herr_t status;
 
   // create the filename
-  std::string filename(P.outdir);
-  filename += std::to_string(nfile);
-  filename += "_proj.h5";
-
-  #ifdef MPI_CHOLLA
-  filename += "." + std::to_string(procID);
-  #endif /*MPI_CHOLLA*/
+  std::string filename = FnameTemplate(P).format_fname(nfile, "_proj");
 
   // Create a new file
   file_id = H5Fcreate(filename.data(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -404,36 +391,30 @@ void OutputProjectedData(Grid3D &G, struct parameters P, int nfile)
 
   #ifdef MPI_CHOLLA
   if (status < 0) {
-    printf("OutputProjectedData: File write failed. ProcID: %d\n", procID);
+    printf("Output_Projected_Data: File write failed. ProcID: %d\n", procID);
     chexit(-1);
   }
   #else
   if (status < 0) {
-    printf("OutputProjectedData: File write failed.\n");
+    printf("Output_Projected_Data: File write failed.\n");
     exit(-1);
   }
   #endif
 
 #else
-  printf("OutputProjected Data only defined for hdf5 writes.\n");
+  printf("Output_Projected_Data only defined for hdf5 writes.\n");
 #endif  // HDF5
 }
 
 /* Output a rotated projection of the grid data to file. */
-void OutputRotatedProjectedData(Grid3D &G, struct parameters P, int nfile)
+void Output_Rotated_Projected_Data(Grid3D &G, struct Parameters P, int nfile)
 {
 #ifdef HDF5
   hid_t file_id;
   herr_t status;
 
   // create the filename
-  std::string filename(P.outdir);
-  filename += std::to_string(nfile);
-  filename += "_rot_proj.h5";
-
-  #ifdef MPI_CHOLLA
-  filename += "." + std::to_string(procID);
-  #endif /*MPI_CHOLLA*/
+  std::string filename = FnameTemplate(P).format_fname(nfile, "_rot_proj");
 
   if (G.R.flag_delta == 1) {
     // if flag_delta==1, then we are just outputting a
@@ -461,12 +442,12 @@ void OutputRotatedProjectedData(Grid3D &G, struct parameters P, int nfile)
       status = H5Fclose(file_id);
   #ifdef MPI_CHOLLA
       if (status < 0) {
-        printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID);
+        printf("Output_Rotated_Projected_Data: File write failed. ProcID: %d\n", procID);
         chexit(-1);
       }
   #else
       if (status < 0) {
-        printf("OutputRotatedProjectedData: File write failed.\n");
+        printf("Output_Rotated_Projected_Data: File write failed.\n");
         exit(-1);
       }
   #endif
@@ -509,36 +490,30 @@ void OutputRotatedProjectedData(Grid3D &G, struct parameters P, int nfile)
 
   #ifdef MPI_CHOLLA
   if (status < 0) {
-    printf("OutputRotatedProjectedData: File write failed. ProcID: %d\n", procID);
+    printf("Output_Rotated_Projected_Data: File write failed. ProcID: %d\n", procID);
     chexit(-1);
   }
   #else
   if (status < 0) {
-    printf("OutputRotatedProjectedData: File write failed.\n");
+    printf("Output_Rotated_Projected_Data: File write failed.\n");
     exit(-1);
   }
   #endif
 
 #else
-  printf("OutputRotatedProjectedData only defined for HDF5 writes.\n");
+  printf("Output_Rotated_Projected_Data only defined for HDF5 writes.\n");
 #endif
 }
 
 /* Output xy, xz, and yz slices of the grid data. */
-void OutputSlices(Grid3D &G, struct parameters P, int nfile)
+void Output_Slices(Grid3D &G, struct Parameters P, int nfile)
 {
 #ifdef HDF5
   hid_t file_id;
   herr_t status;
 
   // create the filename
-  std::string filename(P.outdir);
-  filename += std::to_string(nfile);
-  filename += "_slice.h5";
-
-  #ifdef MPI_CHOLLA
-  filename += "." + std::to_string(procID);
-  #endif /*MPI_CHOLLA*/
+  std::string filename = FnameTemplate(P).format_fname(nfile, "_slice");
 
   // Create a new file
   file_id = H5Fcreate(filename.data(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -554,17 +529,17 @@ void OutputSlices(Grid3D &G, struct parameters P, int nfile)
 
   #ifdef MPI_CHOLLA
   if (status < 0) {
-    printf("OutputSlices: File write failed. ProcID: %d\n", procID);
+    printf("Output_Slices: File write failed. ProcID: %d\n", procID);
     chexit(-1);
   }
   #else   // MPI_CHOLLA is not defined
   if (status < 0) {
-    printf("OutputSlices: File write failed.\n");
+    printf("Output_Slices: File write failed.\n");
     exit(-1);
   }
   #endif  // MPI_CHOLLA
 #else     // HDF5 is not defined
-  printf("OutputSlices only defined for hdf5 writes.\n");
+  printf("Output_Slices only defined for hdf5 writes.\n");
 #endif    // HDF5
 }
 
@@ -649,6 +624,12 @@ void Grid3D::Write_Header_HDF5(hid_t file_id)
   attribute_id           = H5Acreate(file_id, "Macro Flags", stringType, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
   const char *macroFlags = MACRO_FLAGS;
   status                 = H5Awrite(attribute_id, stringType, &macroFlags);
+  H5Aclose(attribute_id);
+
+  // attribute to help yt differentiate cholla outputs from outputs produced by other codes
+  attribute_id         = H5Acreate(file_id, "cholla", stringType, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+  const char *dummyStr = "";  // this doesn't really matter right now
+  status               = H5Awrite(attribute_id, stringType, &dummyStr);
   H5Aclose(attribute_id);
 
   // Numeric Attributes
@@ -773,7 +754,7 @@ void Grid3D::Write_Header_Rotated_HDF5(hid_t file_id)
         Get_Position(H.n_ghost + i * (H.nx - 2 * H.n_ghost), H.n_ghost + j * (H.ny - 2 * H.n_ghost),
                      H.n_ghost + k * (H.nz - 2 * H.n_ghost), &x, &y, &z);
         // rotate cell position
-        rotate_point(x, y, z, R.delta, R.phi, R.theta, &xp, &yp, &zp);
+        Rotate_Point(x, y, z, R.delta, R.phi, R.theta, &xp, &yp, &zp);
         // find projected location
         // assumes box centered at [0,0,0]
         alpha    = (R.nx * (xp + 0.5 * R.Lx) / R.Lx);
@@ -1385,12 +1366,12 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
     #ifdef OUTPUT_METALS
   output_metals = true;
     #else   // not OUTPUT_METALS
-  output_metals          = false;
+  output_metals = false;
     #endif  // OUTPUT_METALS
     #ifdef OUTPUT_ELECTRONS
   output_electrons = true;
     #else   // not OUTPUT_ELECTRONS
-  output_electrons       = false;
+  output_electrons = false;
     #endif  // OUTPUT_ELECTRONS
     #ifdef OUTPUT_FULL_IONIZATION
   output_full_ionization = true;
@@ -1491,12 +1472,12 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
 
   #ifdef MHD
     if (H.Output_Complete_Data) {
-      WriteHDF5Field3D(H.nx, H.ny, H.nx_real + 1, H.ny_real, H.nz_real, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), C.d_magnetic_x, "/magnetic_x", 0);
-      WriteHDF5Field3D(H.nx, H.ny, H.nx_real, H.ny_real + 1, H.nz_real, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), C.d_magnetic_y, "/magnetic_y", 1);
-      WriteHDF5Field3D(H.nx, H.ny, H.nx_real, H.ny_real, H.nz_real + 1, H.n_ghost, file_id, dataset_buffer,
-                       device_dataset_vector.data(), C.d_magnetic_z, "/magnetic_z", 2);
+      Write_HDF5_Field_3D(H.nx, H.ny, H.nx_real + 1, H.ny_real, H.nz_real, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), C.d_magnetic_x, "/magnetic_x", 0);
+      Write_HDF5_Field_3D(H.nx, H.ny, H.nx_real, H.ny_real + 1, H.nz_real, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), C.d_magnetic_y, "/magnetic_y", 1);
+      Write_HDF5_Field_3D(H.nx, H.ny, H.nx_real, H.ny_real, H.nz_real + 1, H.n_ghost, file_id, dataset_buffer,
+                          device_dataset_vector.data(), C.d_magnetic_z, "/magnetic_z", 2);
     }
   #endif  // MHD
   }
@@ -1511,18 +1492,16 @@ void Grid3D::Write_Grid_HDF5(hid_t file_id)
  * current simulation time. */
 void Grid3D::Write_Projection_HDF5(hid_t file_id)
 {
-  int i, j, k, id, buf_id;
   hid_t dataset_id, dataspace_xy_id, dataspace_xz_id;
   Real *dataset_buffer_dxy, *dataset_buffer_dxz;
   Real *dataset_buffer_Txy, *dataset_buffer_Txz;
   herr_t status;
-  Real dxy, dxz, Txy, Txz, n, T;
+  Real dxy, dxz, Txy, Txz;
   #ifdef DUST
   Real dust_xy, dust_xz;
   Real *dataset_buffer_dust_xy, *dataset_buffer_dust_xz;
   #endif
 
-  n = T   = 0;
   Real mu = 0.6;
 
   // 3D
@@ -1548,37 +1527,51 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
     dataspace_xz_id = H5Screate_simple(2, dims, NULL);
 
     // Copy the xy density and temperature projections to the memory buffer
-    for (j = 0; j < H.ny_real; j++) {
-      for (i = 0; i < H.nx_real; i++) {
+    for (int j = 0; j < H.ny_real; j++) {
+      for (int i = 0; i < H.nx_real; i++) {
         dxy = 0;
         Txy = 0;
   #ifdef DUST
         dust_xy = 0;
   #endif
         // for each xy element, sum over the z column
-        for (k = 0; k < H.nz_real; k++) {
-          id = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        for (int k = 0; k < H.nz_real; k++) {
+          int const xid = i + H.n_ghost;
+          int const yid = j + H.n_ghost;
+          int const zid = k + H.n_ghost;
+          int const id  = cuda_utilities::compute1DIndex(xid, yid, zid, H.nx, H.ny);
+
           // sum density
-          dxy += C.density[id] * H.dz;
+          Real const d = C.density[id];
+          dxy += d * H.dz;
   #ifdef DUST
           dust_xy += C.dust_density[id] * H.dz;
   #endif
           // calculate number density
-          n = C.density[id] * DENSITY_UNIT / (mu * MP);
+          Real const n = d * DENSITY_UNIT / (mu * MP);
+
   // calculate temperature
-  #ifndef DE
-          Real mx = C.momentum_x[id];
-          Real my = C.momentum_y[id];
-          Real mz = C.momentum_z[id];
-          Real E  = C.Energy[id];
-          T       = (E - 0.5 * (mx * mx + my * my + mz * mz) / C.density[id]) * (gama - 1.0) * PRESSURE_UNIT / (n * KB);
-  #endif
   #ifdef DE
-          T = C.GasEnergy[id] * PRESSURE_UNIT * (gama - 1.0) / (n * KB);
-  #endif
-          Txy += T * C.density[id] * H.dz;
+          Real const T = hydro_utilities::Calc_Temp_DE(C.GasEnergy[id], gama, n);
+  #else  // DE is not defined
+          Real const mx = C.momentum_x[id];
+          Real const my = C.momentum_y[id];
+          Real const mz = C.momentum_z[id];
+          Real const E  = C.Energy[id];
+
+    #ifdef MHD
+          auto const magnetic_centered =
+              mhd::utils::cellCenteredMagneticFields(C.host, id, xid, yid, zid, H.n_cells, H.nx, H.ny);
+          Real const T = hydro_utilities::Calc_Temp_Conserved(E, d, mx, my, mz, gama, n, magnetic_centered.x(),
+                                                              magnetic_centered.y(), magnetic_centered.z());
+    #else   // MHD is not defined
+          Real const T = hydro_utilities::Calc_Temp_Conserved(E, d, mx, my, mz, gama, n);
+    #endif  // MHD
+  #endif    // DE
+
+          Txy += T * d * H.dz;
         }
-        buf_id                     = j + i * H.ny_real;
+        int const buf_id           = j + i * H.ny_real;
         dataset_buffer_dxy[buf_id] = dxy;
         dataset_buffer_Txy[buf_id] = Txy;
   #ifdef DUST
@@ -1588,37 +1581,47 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
     }
 
     // Copy the xz density and temperature projections to the memory buffer
-    for (k = 0; k < H.nz_real; k++) {
-      for (i = 0; i < H.nx_real; i++) {
+    for (int k = 0; k < H.nz_real; k++) {
+      for (int i = 0; i < H.nx_real; i++) {
         dxz = 0;
         Txz = 0;
   #ifdef DUST
         dust_xz = 0;
   #endif
         // for each xz element, sum over the y column
-        for (j = 0; j < H.ny_real; j++) {
-          id = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        for (int j = 0; j < H.ny_real; j++) {
+          int const xid = i + H.n_ghost;
+          int const yid = j + H.n_ghost;
+          int const zid = k + H.n_ghost;
+          int const id  = cuda_utilities::compute1DIndex(xid, yid, zid, H.nx, H.ny);
           // sum density
-          dxz += C.density[id] * H.dy;
+          Real const d = C.density[id];
+          dxz += d * H.dy;
   #ifdef DUST
           dust_xz += C.dust_density[id] * H.dy;
   #endif
           // calculate number density
-          n = C.density[id] * DENSITY_UNIT / (mu * MP);
-  // calculate temperature
-  #ifndef DE
-          Real mx = C.momentum_x[id];
-          Real my = C.momentum_y[id];
-          Real mz = C.momentum_z[id];
-          Real E  = C.Energy[id];
-          T       = (E - 0.5 * (mx * mx + my * my + mz * mz) / C.density[id]) * (gama - 1.0) * PRESSURE_UNIT / (n * KB);
-  #endif
+          Real const n = d * DENSITY_UNIT / (mu * MP);
   #ifdef DE
-          T = C.GasEnergy[id] * PRESSURE_UNIT * (gama - 1.0) / (n * KB);
-  #endif
-          Txz += T * C.density[id] * H.dy;
+          Real const T = hydro_utilities::Calc_Temp_DE(C.GasEnergy[id], gama, n);
+  #else  // DE is not defined
+          Real const mx = C.momentum_x[id];
+          Real const my = C.momentum_y[id];
+          Real const mz = C.momentum_z[id];
+          Real const E  = C.Energy[id];
+
+    #ifdef MHD
+          auto const magnetic_centered =
+              mhd::utils::cellCenteredMagneticFields(C.host, id, xid, yid, zid, H.n_cells, H.nx, H.ny);
+          Real const T = hydro_utilities::Calc_Temp_Conserved(E, d, mx, my, mz, gama, n, magnetic_centered.x(),
+                                                              magnetic_centered.y(), magnetic_centered.z());
+    #else   // MHD is not defined
+          Real const T = hydro_utilities::Calc_Temp_Conserved(E, d, mx, my, mz, gama, n);
+    #endif  // MHD
+  #endif    // DE
+          Txz += T * d * H.dy;
         }
-        buf_id                     = k + i * H.nz_real;
+        int const buf_id           = k + i * H.nz_real;
         dataset_buffer_dxz[buf_id] = dxz;
         dataset_buffer_Txz[buf_id] = Txz;
   #ifdef DUST
@@ -1661,7 +1664,6 @@ void Grid3D::Write_Projection_HDF5(hid_t file_id)
  * time. */
 void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
 {
-  int i, j, k, id, buf_id;
   hid_t dataset_id, dataspace_xzr_id;
   Real *dataset_buffer_dxzr;
   Real *dataset_buffer_Txzr;
@@ -1671,14 +1673,13 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
 
   herr_t status;
   Real dxy, dxz, Txy, Txz;
-  Real d, n, T, vx, vy, vz;
+  Real d, vx, vy, vz;
 
   Real x, y, z;      // cell positions
   Real xp, yp, zp;   // rotated positions
   Real alpha, beta;  // projected positions
   int ix, iz;        // projected index positions
 
-  n = T   = 0;
   Real mu = 0.6;
 
   srand(137);      // initialize a random number
@@ -1725,11 +1726,14 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
     dataspace_xzr_id = H5Screate_simple(2, dims, NULL);
 
     // Copy the xz rotated projection to the memory buffer
-    for (k = 0; k < H.nz_real; k++) {
-      for (i = 0; i < H.nx_real; i++) {
-        for (j = 0; j < H.ny_real; j++) {
+    for (int k = 0; k < H.nz_real; k++) {
+      for (int i = 0; i < H.nx_real; i++) {
+        for (int j = 0; j < H.ny_real; j++) {
           // get cell index
-          id = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+          int const xid = i + H.n_ghost;
+          int const yid = j + H.n_ghost;
+          int const zid = k + H.n_ghost;
+          int const id  = cuda_utilities::compute1DIndex(xid, yid, zid, H.nx, H.ny);
 
           // get cell positions
           Get_Position(i + H.n_ghost, j + H.n_ghost, k + H.n_ghost, &x, &y, &z);
@@ -1740,7 +1744,7 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
           z += eps * H.dz * (drand48() - 0.5);
 
           // rotate cell positions
-          rotate_point(x, y, z, R.delta, R.phi, R.theta, &xp, &yp, &zp);
+          Rotate_Point(x, y, z, R.delta, R.phi, R.theta, &xp, &yp, &zp);
 
           // find projected locations
           // assumes box centered at [0,0,0]
@@ -1754,33 +1758,39 @@ void Grid3D::Write_Rotated_Projection_HDF5(hid_t file_id)
   #endif
 
           if ((ix >= 0) && (ix < nx_dset) && (iz >= 0) && (iz < nz_dset)) {
-            buf_id = iz + ix * nz_dset;
-            d      = C.density[id];
+            int const buf_id = iz + ix * nz_dset;
+            d                = C.density[id];
             // project density
             dataset_buffer_dxzr[buf_id] += d * H.dy;
             // calculate number density
-            n = d * DENSITY_UNIT / (mu * MP);
+            Real const n = d * DENSITY_UNIT / (mu * MP);
+
   // calculate temperature
-  #ifndef DE
-            Real mx = C.momentum_x[id];
-            Real my = C.momentum_y[id];
-            Real mz = C.momentum_z[id];
-            Real E  = C.Energy[id];
-            T = (E - 0.5 * (mx * mx + my * my + mz * mz) / C.density[id]) * (gama - 1.0) * PRESSURE_UNIT / (n * KB);
-  #endif
   #ifdef DE
-            T = C.GasEnergy[id] * PRESSURE_UNIT * (gama - 1.0) / (n * KB);
-  #endif
+            Real const T = hydro_utilities::Calc_Temp_DE(C.GasEnergy[id], gama, n);
+  #else  // DE is not defined
+            Real const mx = C.momentum_x[id];
+            Real const my = C.momentum_y[id];
+            Real const mz = C.momentum_z[id];
+            Real const E  = C.Energy[id];
+
+    #ifdef MHD
+            auto const magnetic_centered =
+                mhd::utils::cellCenteredMagneticFields(C.host, id, xid, yid, zid, H.n_cells, H.nx, H.ny);
+            Real const T = hydro_utilities::Calc_Temp_Conserved(E, d, mx, my, mz, gama, n, magnetic_centered.x(),
+                                                                magnetic_centered.y(), magnetic_centered.z());
+    #else   // MHD is not defined
+            Real const T = hydro_utilities::Calc_Temp_Conserved(E, d, mx, my, mz, gama, n);
+    #endif  // MHD
+  #endif    // DE
+
             Txz = T * d * H.dy;
             dataset_buffer_Txzr[buf_id] += Txz;
 
             // compute velocities
-            vx = C.momentum_x[id];
-            dataset_buffer_vxxzr[buf_id] += vx * H.dy;
-            vy = C.momentum_y[id];
-            dataset_buffer_vyxzr[buf_id] += vy * H.dy;
-            vz = C.momentum_z[id];
-            dataset_buffer_vzxzr[buf_id] += vz * H.dy;
+            dataset_buffer_vxxzr[buf_id] += C.momentum_x[id] * H.dy;
+            dataset_buffer_vyxzr[buf_id] += C.momentum_y[id] * H.dy;
+            dataset_buffer_vzxzr[buf_id] += C.momentum_z[id] * H.dy;
           }
         }
       }
@@ -1857,6 +1867,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     dataset_buffer_my = (Real *)malloc(H.nx_real * H.ny_real * sizeof(Real));
     dataset_buffer_mz = (Real *)malloc(H.nx_real * H.ny_real * sizeof(Real));
     dataset_buffer_E  = (Real *)malloc(H.nx_real * H.ny_real * sizeof(Real));
+  #ifdef MHD
+    std::vector<Real> dataset_buffer_magnetic_x(H.nx_real * H.ny_real);
+    std::vector<Real> dataset_buffer_magnetic_y(H.nx_real * H.ny_real);
+    std::vector<Real> dataset_buffer_magnetic_z(H.nx_real * H.ny_real);
+  #endif  // MHD
   #ifdef DE
     dataset_buffer_GE = (Real *)malloc(H.nx_real * H.ny_real * sizeof(Real));
   #endif
@@ -1867,19 +1882,38 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     // Copy the xy slices to the memory buffers
     for (j = 0; j < H.ny_real; j++) {
       for (i = 0; i < H.nx_real; i++) {
-        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + zslice * H.nx * H.ny;
+        id     = cuda_utilities::compute1DIndex(i + H.n_ghost, j + H.n_ghost, zslice, H.nx, H.ny);
         buf_id = j + i * H.ny_real;
+  #ifdef MHD
+        int id_xm1 = cuda_utilities::compute1DIndex(i + H.n_ghost - 1, j + H.n_ghost, zslice, H.nx, H.ny);
+        int id_ym1 = cuda_utilities::compute1DIndex(i + H.n_ghost, j + H.n_ghost - 1, zslice, H.nx, H.ny);
+        int id_zm1 = cuda_utilities::compute1DIndex(i + H.n_ghost, j + H.n_ghost, zslice - 1, H.nx, H.ny);
+  #endif  // MHD
   #ifdef MPI_CHOLLA
         // When there are multiple processes, check whether this slice is in
         // your domain
         if (zslice >= nz_local_start && zslice < nz_local_start + nz_local) {
-          id = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (zslice - nz_local_start + H.n_ghost) * H.nx * H.ny;
-  #endif  // MPI_CHOLLA
+          id = cuda_utilities::compute1DIndex(i + H.n_ghost, j + H.n_ghost, zslice - nz_local_start + H.n_ghost, H.nx,
+                                              H.ny);
+    #ifdef MHD
+          int id_xm1 = cuda_utilities::compute1DIndex(i + H.n_ghost - 1, j + H.n_ghost,
+                                                      zslice - nz_local_start + H.n_ghost, H.nx, H.ny);
+          int id_ym1 = cuda_utilities::compute1DIndex(i + H.n_ghost, j + H.n_ghost - 1,
+                                                      zslice - nz_local_start + H.n_ghost, H.nx, H.ny);
+          int id_zm1 = cuda_utilities::compute1DIndex(i + H.n_ghost, j + H.n_ghost,
+                                                      zslice - nz_local_start + H.n_ghost - 1, H.nx, H.ny);
+    #endif  // MHD
+  #endif    // MPI_CHOLLA
           dataset_buffer_d[buf_id]  = C.density[id];
           dataset_buffer_mx[buf_id] = C.momentum_x[id];
           dataset_buffer_my[buf_id] = C.momentum_y[id];
           dataset_buffer_mz[buf_id] = C.momentum_z[id];
           dataset_buffer_E[buf_id]  = C.Energy[id];
+  #ifdef MHD
+          dataset_buffer_magnetic_x[buf_id] = 0.5 * (C.magnetic_x[id] + C.magnetic_x[id_xm1]);
+          dataset_buffer_magnetic_y[buf_id] = 0.5 * (C.magnetic_y[id] + C.magnetic_y[id_ym1]);
+          dataset_buffer_magnetic_z[buf_id] = 0.5 * (C.magnetic_z[id] + C.magnetic_z[id_zm1]);
+  #endif  // MHD
   #ifdef DE
           dataset_buffer_GE[buf_id] = C.GasEnergy[id];
   #endif
@@ -1897,6 +1931,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
           dataset_buffer_my[buf_id] = 0;
           dataset_buffer_mz[buf_id] = 0;
           dataset_buffer_E[buf_id]  = 0;
+    #ifdef MHD
+          dataset_buffer_magnetic_x[buf_id] = 0;
+          dataset_buffer_magnetic_y[buf_id] = 0;
+          dataset_buffer_magnetic_z[buf_id] = 0;
+    #endif  // MHD
     #ifdef DE
           dataset_buffer_GE[buf_id] = 0;
     #endif
@@ -1916,6 +1955,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_my, "/my_xy");
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_mz, "/mz_xy");
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_E, "/E_xy");
+  #ifdef MHD
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_x.data(), "/magnetic_x_xy");
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_y.data(), "/magnetic_y_xy");
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_z.data(), "/magnetic_z_xy");
+  #endif  // MHD
   #ifdef DE
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_GE, "/GE_xy");
   #endif
@@ -1949,6 +1993,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     dataset_buffer_my = (Real *)malloc(H.nx_real * H.nz_real * sizeof(Real));
     dataset_buffer_mz = (Real *)malloc(H.nx_real * H.nz_real * sizeof(Real));
     dataset_buffer_E  = (Real *)malloc(H.nx_real * H.nz_real * sizeof(Real));
+  #ifdef MHD
+    dataset_buffer_magnetic_x.resize(H.nx_real * H.nz_real);
+    dataset_buffer_magnetic_y.resize(H.nx_real * H.nz_real);
+    dataset_buffer_magnetic_z.resize(H.nx_real * H.nz_real);
+  #endif  // MHD
   #ifdef DE
     dataset_buffer_GE = (Real *)malloc(H.nx_real * H.nz_real * sizeof(Real));
   #endif
@@ -1959,19 +2008,38 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     // Copy the xz slices to the memory buffers
     for (k = 0; k < H.nz_real; k++) {
       for (i = 0; i < H.nx_real; i++) {
-        id     = (i + H.n_ghost) + yslice * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        id     = cuda_utilities::compute1DIndex(i + H.n_ghost, yslice, k + H.n_ghost, H.nx, H.ny);
         buf_id = k + i * H.nz_real;
+  #ifdef MHD
+        int id_xm1 = cuda_utilities::compute1DIndex(i + H.n_ghost - 1, yslice, k + H.n_ghost, H.nx, H.ny);
+        int id_ym1 = cuda_utilities::compute1DIndex(i + H.n_ghost, yslice - 1, k + H.n_ghost, H.nx, H.ny);
+        int id_zm1 = cuda_utilities::compute1DIndex(i + H.n_ghost, yslice, k + H.n_ghost - 1, H.nx, H.ny);
+  #endif  // MHD
   #ifdef MPI_CHOLLA
         // When there are multiple processes, check whether this slice is in
         // your domain
         if (yslice >= ny_local_start && yslice < ny_local_start + ny_local) {
-          id = (i + H.n_ghost) + (yslice - ny_local_start + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
-  #endif  // MPI_CHOLLA
+          id = cuda_utilities::compute1DIndex(i + H.n_ghost, yslice - ny_local_start + H.n_ghost, k + H.n_ghost, H.nx,
+                                              H.ny);
+    #ifdef MHD
+          int id_xm1 = cuda_utilities::compute1DIndex(i + H.n_ghost - 1, yslice - ny_local_start + H.n_ghost,
+                                                      k + H.n_ghost, H.nx, H.ny);
+          int id_ym1 = cuda_utilities::compute1DIndex(i + H.n_ghost, yslice - ny_local_start + H.n_ghost - 1,
+                                                      k + H.n_ghost, H.nx, H.ny);
+          int id_zm1 = cuda_utilities::compute1DIndex(i + H.n_ghost, yslice - ny_local_start + H.n_ghost,
+                                                      k + H.n_ghost - 1, H.nx, H.ny);
+    #endif  // MHD
+  #endif    // MPI_CHOLLA
           dataset_buffer_d[buf_id]  = C.density[id];
           dataset_buffer_mx[buf_id] = C.momentum_x[id];
           dataset_buffer_my[buf_id] = C.momentum_y[id];
           dataset_buffer_mz[buf_id] = C.momentum_z[id];
           dataset_buffer_E[buf_id]  = C.Energy[id];
+  #ifdef MHD
+          dataset_buffer_magnetic_x[buf_id] = 0.5 * (C.magnetic_x[id] + C.magnetic_x[id_xm1]);
+          dataset_buffer_magnetic_y[buf_id] = 0.5 * (C.magnetic_y[id] + C.magnetic_y[id_ym1]);
+          dataset_buffer_magnetic_z[buf_id] = 0.5 * (C.magnetic_z[id] + C.magnetic_z[id_zm1]);
+  #endif  // MHD
   #ifdef DE
           dataset_buffer_GE[buf_id] = C.GasEnergy[id];
   #endif
@@ -1989,6 +2057,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
           dataset_buffer_my[buf_id] = 0;
           dataset_buffer_mz[buf_id] = 0;
           dataset_buffer_E[buf_id]  = 0;
+    #ifdef MHD
+          dataset_buffer_magnetic_x[buf_id] = 0;
+          dataset_buffer_magnetic_y[buf_id] = 0;
+          dataset_buffer_magnetic_z[buf_id] = 0;
+    #endif  // MHD
     #ifdef DE
           dataset_buffer_GE[buf_id] = 0;
     #endif
@@ -2008,6 +2081,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_my, "/my_xz");
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_mz, "/mz_xz");
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_E, "/E_xz");
+  #ifdef MHD
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_x.data(), "/magnetic_x_xz");
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_y.data(), "/magnetic_y_xz");
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_z.data(), "/magnetic_z_xz");
+  #endif  // MHD
   #ifdef DE
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_GE, "/GE_xz");
   #endif
@@ -2042,6 +2120,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     dataset_buffer_my = (Real *)malloc(H.ny_real * H.nz_real * sizeof(Real));
     dataset_buffer_mz = (Real *)malloc(H.ny_real * H.nz_real * sizeof(Real));
     dataset_buffer_E  = (Real *)malloc(H.ny_real * H.nz_real * sizeof(Real));
+  #ifdef MHD
+    dataset_buffer_magnetic_x.resize(H.ny_real * H.nz_real);
+    dataset_buffer_magnetic_y.resize(H.ny_real * H.nz_real);
+    dataset_buffer_magnetic_z.resize(H.ny_real * H.nz_real);
+  #endif  // MHD
   #ifdef DE
     dataset_buffer_GE = (Real *)malloc(H.ny_real * H.nz_real * sizeof(Real));
   #endif
@@ -2052,19 +2135,37 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     // Copy the yz slices to the memory buffers
     for (k = 0; k < H.nz_real; k++) {
       for (j = 0; j < H.ny_real; j++) {
-        id     = xslice + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        id     = cuda_utilities::compute1DIndex(xslice, j + H.n_ghost, k + H.n_ghost, H.nx, H.ny);
         buf_id = k + j * H.nz_real;
+  #ifdef MHD
+        int id_xm1 = cuda_utilities::compute1DIndex(xslice - 1, j + H.n_ghost, k + H.n_ghost, H.nx, H.ny);
+        int id_ym1 = cuda_utilities::compute1DIndex(xslice, j + H.n_ghost - 1, k + H.n_ghost, H.nx, H.ny);
+        int id_zm1 = cuda_utilities::compute1DIndex(xslice, j + H.n_ghost, k + H.n_ghost - 1, H.nx, H.ny);
+  #endif  // MHD
   #ifdef MPI_CHOLLA
         // When there are multiple processes, check whether this slice is in
         // your domain
         if (xslice >= nx_local_start && xslice < nx_local_start + nx_local) {
-          id = (xslice - nx_local_start) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
-  #endif  // MPI_CHOLLA
+          id = cuda_utilities::compute1DIndex(xslice - nx_local_start, j + H.n_ghost, k + H.n_ghost, H.nx, H.ny);
+    #ifdef MHD
+          int id_xm1 =
+              cuda_utilities::compute1DIndex(xslice - nx_local_start - 1, j + H.n_ghost, k + H.n_ghost, H.nx, H.ny);
+          int id_ym1 =
+              cuda_utilities::compute1DIndex(xslice - nx_local_start, j + H.n_ghost - 1, k + H.n_ghost, H.nx, H.ny);
+          int id_zm1 =
+              cuda_utilities::compute1DIndex(xslice - nx_local_start, j + H.n_ghost, k + H.n_ghost - 1, H.nx, H.ny);
+    #endif  // MHD
+  #endif    // MPI_CHOLLA
           dataset_buffer_d[buf_id]  = C.density[id];
           dataset_buffer_mx[buf_id] = C.momentum_x[id];
           dataset_buffer_my[buf_id] = C.momentum_y[id];
           dataset_buffer_mz[buf_id] = C.momentum_z[id];
           dataset_buffer_E[buf_id]  = C.Energy[id];
+  #ifdef MHD
+          dataset_buffer_magnetic_x[buf_id] = 0.5 * (C.magnetic_x[id] + C.magnetic_x[id_xm1]);
+          dataset_buffer_magnetic_y[buf_id] = 0.5 * (C.magnetic_y[id] + C.magnetic_y[id_ym1]);
+          dataset_buffer_magnetic_z[buf_id] = 0.5 * (C.magnetic_z[id] + C.magnetic_z[id_zm1]);
+  #endif  // MHD
   #ifdef DE
           dataset_buffer_GE[buf_id] = C.GasEnergy[id];
   #endif
@@ -2082,6 +2183,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
           dataset_buffer_my[buf_id] = 0;
           dataset_buffer_mz[buf_id] = 0;
           dataset_buffer_E[buf_id]  = 0;
+    #ifdef MHD
+          dataset_buffer_magnetic_x[buf_id] = 0;
+          dataset_buffer_magnetic_y[buf_id] = 0;
+          dataset_buffer_magnetic_z[buf_id] = 0;
+    #endif  // MHD
     #ifdef DE
           dataset_buffer_GE[buf_id] = 0;
     #endif
@@ -2101,6 +2207,11 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_my, "/my_yz");
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_mz, "/mz_yz");
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_E, "/E_yz");
+  #ifdef MHD
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_x.data(), "/magnetic_x_yz");
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_y.data(), "/magnetic_y_yz");
+    status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_magnetic_z.data(), "/magnetic_z_yz");
+  #endif  // MHD
   #ifdef DE
     status = Write_HDF5_Dataset(file_id, dataspace_id, dataset_buffer_GE, "/GE_yz");
   #endif
@@ -2130,9 +2241,9 @@ void Grid3D::Write_Slices_HDF5(hid_t file_id)
 }
 #endif  // HDF5
 
-/*! \fn void Read_Grid(struct parameters P)
+/*! \fn void Read_Grid(struct Parameters P)
  *  \brief Read in grid data from an output file. */
-void Grid3D::Read_Grid(struct parameters P)
+void Grid3D::Read_Grid(struct Parameters P)
 {
   ScopedTimer timer("Read_Grid");
   int nfile = P.nfile;  // output step you want to read from
@@ -2143,6 +2254,7 @@ void Grid3D::Read_Grid(struct parameters P)
   // Changed to read initial conditions from indir
   std::string filename(P.indir);
   filename += std::to_string(P.nfile);
+  char sbuffer[1024];
 
 #if defined BINARY
   filename += ".bin";
@@ -2152,12 +2264,13 @@ void Grid3D::Read_Grid(struct parameters P)
 // for now assumes you will run on the same number of processors
 #ifdef MPI_CHOLLA
   #ifdef TILED_INITIAL_CONDITIONS
-  sprintf(filename, "%sics_%dMpc_%d.h5", P.indir, (int)P.tile_length / 1000,
+  sprintf(sbuffer, "%sics_%dMpc_%d.h5", P.indir, (int)P.tile_length / 1000,
           H.nx_real);  // Everyone reads the same file
-  #else                // TILED_INITIAL_CONDITIONS is not defined
+  filename = sbuffer;
+  #else   // TILED_INITIAL_CONDITIONS is not defined
   filename += "." + std::to_string(procID);
-  #endif               // TILED_INITIAL_CONDITIONS
-#endif                 // MPI_CHOLLA
+  #endif  // TILED_INITIAL_CONDITIONS
+#endif    // MPI_CHOLLA
 
 #if defined BINARY
   FILE *fp;
@@ -2383,9 +2496,265 @@ void Read_Grid_HDF5_Field_Magnetic(hid_t file_id, Real *dataset_buffer, Header H
                              dataset_buffer, grid_buffer);
 }
 
+  #if defined(PRINT_INITIAL_STATS) && defined(COSMOLOGY)
+/*! \fn void Print_Stats(Grid3D &G)
+ *  \brief Compute stats for a grid. */
+void Print_Stats(Grid3D &G)
+{
+  // Synchronize
+  cudaMemcpy(G.C.density, G.C.device, G.H.n_fields * G.H.n_cells * sizeof(Real), cudaMemcpyDeviceToHost);
+  // Write data
+  G.Print_Grid_Stats();
+}
+
+/*! \fn void Print_Grid_Stats(void)
+ *  \brief Compute stats for grid properties. */
+void Grid3D::Print_Grid_Stats(void)
+{
+  int i, j, k, id, buf_id;
+  Real mean_l, min_l, max_l;
+  Real mean_g, min_g, max_g;
+
+  // Print several interesting numbers
+
+  // Density stats
+  mean_l = 0;
+  min_l  = 1e65;
+  max_l  = -1;
+  // Do density first
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        mean_l += C.density[id];
+        max_l = std::max(max_l, C.density[id]);
+        min_l = std::min(min_l, C.density[id]);
+      }
+    }
+  }
+  mean_l /= ((H.nz_real) * (H.ny_real) * (H.nx_real));
+
+    #if MPI_CHOLLA
+  mean_g = ReduceRealAvg(mean_l);
+  max_g  = ReduceRealMax(max_l);
+  min_g  = ReduceRealMin(min_l);
+  mean_l = mean_g;
+  max_l  = max_g;
+  min_l  = min_g;
+    #endif  // MPI_CHOLLA
+  chprintf("Density  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3] \n", mean_l, min_l, max_l);
+
+  // Momentum stats
+
+  // x momenta
+  mean_l = 0;
+  min_l  = 1e65;
+  max_l  = -1;
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        mean_l += std::abs(C.momentum_x[id]);
+        max_l = std::max(max_l, std::abs(C.momentum_x[id]));
+        min_l = std::min(min_l, std::abs(C.momentum_x[id]));
+      }
+    }
+  }
+  mean_l /= ((H.nz_real) * (H.ny_real) * (H.nx_real));
+
+    #if MPI_CHOLLA
+  mean_g = ReduceRealAvg(mean_l);
+  max_g  = ReduceRealMax(max_l);
+  min_g  = ReduceRealMin(min_l);
+  mean_l = mean_g;
+  max_l  = max_g;
+  min_l  = min_g;
+    #endif  // MPI_CHOLLA
+  chprintf(" abs(Momentum X)  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3 km s^-1] \n", mean_l, min_l, max_l);
+
+  // y momenta
+  mean_l = 0;
+  min_l  = 1e65;
+  max_l  = -1;
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        mean_l += std::abs(C.momentum_y[id]);
+        max_l = std::max(max_l, std::abs(C.momentum_y[id]));
+        min_l = std::min(min_l, std::abs(C.momentum_y[id]));
+      }
+    }
+  }
+  mean_l /= ((H.nz_real) * (H.ny_real) * (H.nx_real));
+
+    #if MPI_CHOLLA
+  mean_g = ReduceRealAvg(mean_l);
+  max_g  = ReduceRealMax(max_l);
+  min_g  = ReduceRealMin(min_l);
+  mean_l = mean_g;
+  max_l  = max_g;
+  min_l  = min_g;
+    #endif  // MPI_CHOLLA
+  chprintf(" abs(Momentum Y)  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3 km s^-1] \n", mean_l, min_l, max_l);
+
+  // z momenta
+  mean_l = 0;
+  min_l  = 1e65;
+  max_l  = -1;
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        mean_l += std::abs(C.momentum_z[id]);
+        max_l = std::max(max_l, std::abs(C.momentum_z[id]));
+        min_l = std::min(min_l, std::abs(C.momentum_z[id]));
+      }
+    }
+  }
+  mean_l /= ((H.nz_real) * (H.ny_real) * (H.nx_real));
+
+    #if MPI_CHOLLA
+  mean_g = ReduceRealAvg(mean_l);
+  max_g  = ReduceRealMax(max_l);
+  min_g  = ReduceRealMin(min_l);
+  mean_l = mean_g;
+  max_l  = max_g;
+  min_l  = min_g;
+    #endif  // MPI_CHOLLA
+  chprintf(" abs(Momentum Z)  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3 km s^-1] \n", mean_l, min_l, max_l);
+
+  // Energy
+  mean_l = 0;
+  min_l  = 1e65;
+  max_l  = -1;
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        mean_l += C.Energy[id];
+        max_l = std::max(max_l, C.Energy[id]);
+        min_l = std::min(min_l, C.Energy[id]);
+      }
+    }
+  }
+  mean_l /= ((H.nz_real) * (H.ny_real) * (H.nx_real));
+
+    #if MPI_CHOLLA
+  mean_g = ReduceRealAvg(mean_l);
+  max_g  = ReduceRealMax(max_l);
+  min_g  = ReduceRealMin(min_l);
+  mean_l = mean_g;
+  max_l  = max_g;
+  min_l  = min_g;
+    #endif  // MPI_CHOLLA
+  chprintf(" Energy  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3 km^2 s^-2 ]\n", mean_l, min_l, max_l);
+
+  Real temp, temp_max_l, temp_min_l, temp_mean_l;
+  Real temp_min_g, temp_max_g, temp_mean_g;
+  Real gase, vx, vy, vz;
+  temp_mean_l = 0;
+  temp_min_l  = 1e65;
+  temp_max_l  = -1;
+  mean_l      = 0;
+  min_l       = 1e65;
+  max_l       = -1;
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        vx     = C.momentum_x[id] / C.density[id];
+        vy     = C.momentum_y[id] / C.density[id];
+        vz     = C.momentum_z[id] / C.density[id];
+        gase   = C.Energy[id] - 0.5 * C.density[id] * (vx * vx + vy * vy + vz * vz);
+        mean_l += gase;
+        max_l = std::max(max_l, gase);
+        min_l = std::min(min_l, gase);
+
+        temp = gase / C.density[id] * (gama - 1) * MP / KB * 1e10;
+        temp_mean_l += temp;
+        temp_max_l = std::max(temp_max_l, temp);
+        temp_min_l = std::min(temp_min_l, temp);
+      }
+    }
+  }
+  mean_l /= (H.nz_real * H.ny_real * H.nx_real);
+  temp_mean_l /= (H.nz_real * H.ny_real * H.nx_real);
+
+    #if MPI_CHOLLA
+  mean_g      = ReduceRealAvg(mean_l);
+  max_g       = ReduceRealMax(max_l);
+  min_g       = ReduceRealMin(min_l);
+  mean_l      = mean_g;
+  max_l       = max_g;
+  min_l       = min_g;
+  temp_mean_g = ReduceRealAvg(temp_mean_l);
+  temp_max_g  = ReduceRealMax(temp_max_l);
+  temp_min_g  = ReduceRealMin(temp_min_l);
+  temp_mean_l = temp_mean_g;
+  temp_max_l  = temp_max_g;
+  temp_min_l  = temp_min_g;
+    #endif  // MPI_CHOLLA
+
+  chprintf(" GasEnergyCalc  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3 km^2 s^-2 ] \n", mean_l, min_l, max_l);
+  chprintf(" TemperatureCalc  Mean: %f   Min: %f   Max: %f      [ K ] \n", temp_mean_l, temp_min_l, temp_max_l);
+
+    #ifdef DE
+  temp_mean_l = 0;
+  temp_min_l  = 1e65;
+  temp_max_l  = -1;
+  mean_l      = 0;
+  min_l       = 1e65;
+  max_l       = -1;
+  for (k = 0; k < H.nz_real; k++) {
+    for (j = 0; j < H.ny_real; j++) {
+      for (i = 0; i < H.nx_real; i++) {
+        id     = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+        buf_id = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+        mean_l += C.GasEnergy[id];
+        max_l = std::max(max_l, C.GasEnergy[id]);
+        min_l = std::min(min_l, C.GasEnergy[id]);
+
+        temp = C.GasEnergy[id] / C.density[id] * (gama - 1) * MP / KB * 1e10;
+        temp_mean_l += temp;
+        temp_max_l = std::max(temp_max_l, temp);
+        temp_min_l = std::min(temp_min_l, temp);
+      }
+    }
+  }
+  mean_l /= (H.nz_real * H.ny_real * H.nx_real);
+  temp_mean_l /= (H.nz_real * H.ny_real * H.nx_real);
+
+      #if MPI_CHOLLA
+  mean_g      = ReduceRealAvg(mean_l);
+  max_g       = ReduceRealMax(max_l);
+  min_g       = ReduceRealMin(min_l);
+  mean_l      = mean_g;
+  max_l       = max_g;
+  min_l       = min_g;
+  temp_mean_g = ReduceRealAvg(temp_mean_l);
+  temp_max_g  = ReduceRealMax(temp_max_l);
+  temp_min_g  = ReduceRealMin(temp_min_l);
+  temp_mean_l = temp_mean_g;
+  temp_max_l  = temp_max_g;
+  temp_min_l  = temp_min_g;
+      #endif  // MPI_CHOLLA
+
+  chprintf(" GasEnergyDE  Mean: %f   Min: %f   Max: %f      [ h^2 Msun kpc^-3 km^2 s^-2 ] \n", mean_l, min_l, max_l);
+  chprintf(" TemperatureDE  Mean: %f   Min: %f   Max: %f      [ K ] \n", temp_mean_l, temp_min_l, temp_max_l);
+    #endif  // DE
+}
+  #endif  // PRINT_INITIAL_STATS and COSMOLOGY
+
 /*! \fn void Read_Grid_HDF5(hid_t file_id)
  *  \brief Read in grid data from an hdf5 file. */
-void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
+void Grid3D::Read_Grid_HDF5(hid_t file_id, struct Parameters P)
 {
   int i, j, k, id, buf_id;
   hid_t attribute_id, dataset_id;
@@ -2429,18 +2798,39 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
     #endif  // DUST
 
     #if defined(COOLING_GRACKLE) || defined(CHEMISTRY_GPU)
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HI_density, "/HI_density");
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HII_density, "/HII_density");
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HeI_density, "/HeI_density");
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HeII_density, "/HeII_density");
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HeIII_density, "/HeIII_density");
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.e_density, "/e_density");
+      #ifdef COSMOLOGY
+  if (P.nfile > 0) {
+      #endif  // COSMOLOGY
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HI_density, "/HI_density");
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HII_density, "/HII_density");
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HeI_density, "/HeI_density");
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HeII_density, "/HeII_density");
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.HeIII_density, "/HeIII_density");
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.e_density, "/e_density");
       #ifdef GRACKLE_METALS
-  Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.metal_density, "/metal_density");
+    Read_Grid_HDF5_Field(file_id, dataset_buffer, H, C.metal_density, "/metal_density");
       #endif  // GRACKLE_METALS
+      #ifdef COSMOLOGY
+  } else {
+    // Initialize the density field
+    for (k = 0; k < H.nz_real; k++) {
+      for (j = 0; j < H.ny_real; j++) {
+        for (i = 0; i < H.nx_real; i++) {
+          id                  = (i + H.n_ghost) + (j + H.n_ghost) * H.nx + (k + H.n_ghost) * H.nx * H.ny;
+          buf_id              = k + j * (H.nz_real) + i * (H.nz_real) * (H.ny_real);
+          C.HI_density[id]    = INITIAL_FRACTION_HI * C.density[id];
+          C.HII_density[id]   = INITIAL_FRACTION_HII * C.density[id];
+          C.HeI_density[id]   = INITIAL_FRACTION_HEI * C.density[id];
+          C.HeII_density[id]  = INITIAL_FRACTION_HEII * C.density[id];
+          C.HeIII_density[id] = INITIAL_FRACTION_HEIII * C.density[id];
+          C.e_density[id]     = INITIAL_FRACTION_ELECTRON * C.density[id];
+        }
+      }
+    }
+  }
+      #endif  // COSMOLOGY
     #endif    // COOLING_GRACKLE , CHEMISTRY_GPU
-
-  #endif  // SCALAR
+  #endif      // SCALAR
 
   // MHD only valid in 3D case
   if (H.nx > 1 && H.ny > 1 && H.nz > 1) {
@@ -2587,25 +2977,19 @@ void Grid3D::Read_Grid_HDF5(hid_t file_id, struct parameters P)
 int chprintf(const char *__restrict sdata, ...)  // NOLINT(cert-dcl50-cpp)
 {
   int code = 0;
-#ifdef MPI_CHOLLA
   /*limit printf to root process only*/
-  if (procID == root) {
-#endif /*MPI_CHOLLA*/
-
+  if (Is_Root_Proc()) {
     va_list ap;
     va_start(ap, sdata);
     code = vfprintf(stdout, sdata, ap);  // NOLINT(clang-analyzer-valist.Uninitialized)
     va_end(ap);
     fflush(stdout);
-
-#ifdef MPI_CHOLLA
   }
-#endif /*MPI_CHOLLA*/
 
   return code;
 }
 
-void rotate_point(Real x, Real y, Real z, Real delta, Real phi, Real theta, Real *xp, Real *yp, Real *zp)
+void Rotate_Point(Real x, Real y, Real z, Real delta, Real phi, Real theta, Real *xp, Real *yp, Real *zp)
 {
   Real cd, sd, cp, sp, ct, st;  // sines and cosines
   Real a00, a01, a02;           // rotation matrix elements
@@ -2647,7 +3031,7 @@ void rotate_point(Real x, Real y, Real z, Real delta, Real phi, Real theta, Real
   *zp = a20 * x + a21 * y + a22 * z;
 }
 
-void write_debug(Real *Value, const char *fname, int nValues, int iProc)
+void Write_Debug(Real *Value, const char *fname, int nValues, int iProc)
 {
   char fn[1024];
   int ret;
@@ -2660,4 +3044,91 @@ void write_debug(Real *Value, const char *fname, int nValues, int iProc)
   }
 
   fclose(fp);
+}
+
+std::string FnameTemplate::effective_output_dir_path(int nfile) const noexcept
+{
+  // for consistency, ensure that the returned string always has a trailing "/"
+  if (outdir_.empty()) {
+    return "./";
+  } else if (separate_cycle_dirs_) {
+    return this->outdir_ + "/" + std::to_string(nfile) + "/";
+  } else {
+    // if the last character of outdir is not a '/', then the substring of
+    // characters after the final '/' (or entire string if there isn't any '/')
+    // is treated as a file-prefix
+    //
+    // this is accomplished here:
+    std::filesystem::path without_file_prefix = std::filesystem::path(this->outdir_).parent_path();
+    return without_file_prefix.string() + "/";
+  }
+}
+
+std::string FnameTemplate::format_fname(int nfile, const std::string &pre_extension_suffix) const noexcept
+{
+#ifdef MPI_CHOLLA
+  int file_proc_id = procID;
+#else
+  int file_proc_id = 0;
+#endif
+  return format_fname(nfile, file_proc_id, pre_extension_suffix);
+}
+
+std::string FnameTemplate::format_fname(int nfile, int file_proc_id,
+                                        const std::string &pre_extension_suffix) const noexcept
+{
+  // get the leading section of the string
+  const std::string path_prefix =
+      (separate_cycle_dirs_)
+          ? (effective_output_dir_path(nfile) + "/")  // while redundant, the slash signals our intent
+          : outdir_;
+
+  // get the file extension
+#if defined BINARY
+  const char *extension = ".bin";
+#elif defined HDF5
+  const char *extension = ".h5";
+#else
+  const char *extension = ".txt";
+#endif
+
+  std::string procID_part = "." + std::to_string(file_proc_id);  // initialized to empty string
+
+  return path_prefix + std::to_string(nfile) + pre_extension_suffix + extension + procID_part;
+}
+
+void Ensure_Dir_Exists(std::string dir_path)
+{
+  if (Is_Root_Proc()) {
+    // if the last character of outdir is not a '/', then the substring of
+    // characters after the final '/' (or entire string if there isn't any '/')
+    // is treated as a file-prefix
+    //
+    // this is accomplished here:
+    std::filesystem::path path = std::filesystem::path(dir_path);
+
+    if (!dir_path.empty()) {
+      // try to create all directories specified within outdir (does nothing if
+      // the directories already exist)
+      std::error_code err_code;
+      std::filesystem::create_directories(path, err_code);
+
+      // confirm that an error-code wasn't set & that the path actually refers
+      // to a directory (it's unclear from docs whether err-code is set in that
+      // case)
+      if (err_code or not std::filesystem::is_directory(path)) {
+        CHOLLA_ERROR(
+            "something went wrong while trying to create the path to the "
+            "directory: %s",
+            dir_path.c_str());
+      }
+    }
+  }
+
+  // this barrier ensures we won't ever encounter a scenario when 1 process
+  // tries to write a file to a non-existent directory before the root process
+  // has a chance to create it
+#ifdef MPI_CHOLLA
+  MPI_Barrier(world);
+#endif
 }

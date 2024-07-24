@@ -12,7 +12,9 @@
 
 #include <set>
 
-#include "../io/io.h"  //defines chprintf
+#include "../io/ParameterMap.h"       // define parameter_map
+#include "../io/io.h"                 //defines chprintf
+#include "../utils/error_handling.h"  // defines ASSERT
 
 /* Global variables */
 Real gama;   // Ratio of specific heats
@@ -33,20 +35,21 @@ void Set_Gammas(Real gamma_in)
 {
   // set gamma
   gama = gamma_in;
+  CHOLLA_ASSERT(gama > 1.0, "Gamma must be greater than one.");
 }
 
-/*! \fn double get_time(void)
+/*! \fn double Get_Time(void)
  *  \brief Returns the current clock time. */
-double get_time(void)
+double Get_Time(void)
 {
   struct timeval timer;
   gettimeofday(&timer, NULL);
   return timer.tv_sec + 1.0e-6 * timer.tv_usec;
 }
 
-/*! \fn int sgn
+/*! \fn int Sgn
  *  \brief Mathematical sign function. Returns sign of x. */
-int sgn(Real x)
+int Sgn(Real x)
 {
   if (x < 0) {
     return -1;
@@ -55,28 +58,29 @@ int sgn(Real x)
   }
 }
 
-#ifndef CUDA
-/*! \fn Real calc_eta(Real cW[], Real gamma)
- *  \brief Calculate the eta value for the H correction. */
-Real calc_eta(Real cW[], Real gamma)
+// global mpi-related variables (they are declared here because they are initialized even when
+// the MPI_CHOLLA variable is not defined)
+
+int procID; /*process rank*/
+int nproc;  /*number of processes in global comm*/
+int root;   /*rank of root process*/
+
+/* Used when MPI_CHOLLA is not defined to initialize a subset of the global mpi-related variables
+ * that still meaningful in non-mpi simulations.
+ */
+void Init_Global_Parallel_Vars_No_MPI()
 {
-  Real pl, pr, al, ar;
-
-  pl = (cW[8] - 0.5 * (cW[2] * cW[2] + cW[4] * cW[4] + cW[6] * cW[6]) / cW[0]) * (gamma - 1.0);
-  pl = fmax(pl, TINY_NUMBER);
-  pr = (cW[9] - 0.5 * (cW[3] * cW[3] + cW[5] * cW[5] + cW[7] * cW[7]) / cW[1]) * (gamma - 1.0);
-  pr = fmax(pr, TINY_NUMBER);
-
-  al = sqrt(gamma * pl / cW[0]);
-  ar = sqrt(gamma * pr / cW[1]);
-
-  return 0.5 * fabs((cW[3] / cW[1] + ar) - (cW[2] / cW[0] - al));
+#ifdef MPI_CHOLLA
+  CHOLLA_ERROR("This function should not be executed when compiled with MPI");
+#endif
+  procID = 0;
+  nproc  = 1;
+  root   = 0;
 }
-#endif  // NO CUDA
 
-/*! \fn char trim(char *s)
+/*! \fn char Trim(char *s)
  *  \brief Gets rid of trailing and leading whitespace. */
-char *trim(char *s)
+char *Trim(char *s)
 {
   /* Initialize start, end pointers */
   char *s1 = s, *s2 = &s[strlen(s) - 1];
@@ -98,128 +102,59 @@ char *trim(char *s)
 }
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::set<const char *> optionalParams = {
-    "flag_delta",   "ddelta_dt",   "n_delta",  "Lz",       "Lx",      "phi",     "theta",
-    "delta",        "nzr",         "nxr",      "H0",       "Omega_M", "Omega_L", "Init_redshift",
-    "End_redshift", "tile_length", "n_proc_x", "n_proc_y", "n_proc_z"};
+// NOLINTNEXTLINE(*)
+const std::set<std::string> optionalParams = {
+    "flag_delta", "ddelta_dt",     "n_delta",      "Lz",          "Lx",       "phi",      "theta",   "delta",
+    "nzr",        "nxr",           "H0",           "Omega_M",     "Omega_L",  "Omega_R",  "Omega_K", "w0",
+    "wa",         "Init_redshift", "End_redshift", "tile_length", "n_proc_x", "n_proc_y", "n_proc_z"};  // NOLINT
 
-/*! \fn int is_param_valid(char *name);
- * \brief Verifies that a param is valid (even if not needed).  Avoids
- * "warnings" in output. */
-int is_param_valid(const char *param_name)
-{
-  // for (auto optionalParam = optionalParams.begin(); optionalParam != optionalParams.end(); ++optionalParam) {
-  for (const auto *optionalParam : optionalParams) {
-    if (strcmp(param_name, optionalParam) == 0) {
-      return 1;
-    }
-  }
-  return 0;
-}
+bool Old_Style_Parse_Param(const char *name, const char *value, struct Parameters *parms);
 
-void parse_param(char *name, char *value, struct parameters *parms);
+void Init_Param_Struct_Members(ParameterMap &param, struct Parameters *parms);
 
-/*! \fn void parse_params(char *param_file, struct parameters * parms);
+/*! \fn void Parse_Params(char *param_file, struct Parameters * parms);
  *  \brief Reads the parameters in the given file into a structure. */
-void parse_params(char *param_file, struct parameters *parms, int argc, char **argv)
+void Parse_Params(char *param_file, struct Parameters *parms, int argc, char **argv)
 {
-  int buf;
-  char *s, buff[256];
   FILE *fp = fopen(param_file, "r");
   if (fp == NULL) {
     chprintf("Exiting at file %s line %d: failed to read param file %s \n", __FILE__, __LINE__, param_file);
     exit(1);
     return;
   }
-  // set default hydro file output parameter
-  parms->n_hydro              = 1;
-  parms->n_particle           = 1;
-  parms->n_slice              = 1;
-  parms->n_projection         = 1;
-  parms->n_rotated_projection = 1;
 
-#ifdef ROTATED_PROJECTION
-  // initialize rotation parameters to zero
-  parms->delta      = 0;
-  parms->theta      = 0;
-  parms->phi        = 0;
-  parms->n_delta    = 0;
-  parms->ddelta_dt  = 0;
-  parms->flag_delta = 0;
-#endif /*ROTATED_PROJECTION*/
+  // read/parse the parameters in the file and cmd-args into pmap
+  ParameterMap pmap(fp, argc, argv);
+  fclose(fp);
 
 #ifdef COSMOLOGY
   // Initialize file name as an empty string
   parms->scale_outputs_file[0] = '\0';
 #endif
 
-  /* Read next line */
-  while ((s = fgets(buff, sizeof buff, fp)) != NULL) {
-    /* Skip blank lines and comments */
-    if (buff[0] == '\n' || buff[0] == '#' || buff[0] == ';') {
-      continue;
-    }
+  // the plan is eventually replace Old_Style_Parse_Param entirely with
+  // Init_Param_Struct_Members.
+  auto fn = [&](const char *name, const char *value) -> bool { return Old_Style_Parse_Param(name, value, parms); };
 
-    /* Parse name/value pair from line */
-    char name[MAXLEN], value[MAXLEN];
-    s = strtok(buff, "=");
-    if (s == NULL) {
-      continue;
-    } else {
-      strncpy(name, s, MAXLEN);
-    }
-    s = strtok(NULL, "=");
-    if (s == NULL) {
-      continue;
-    } else {
-      strncpy(value, s, MAXLEN);
-    }
-    trim(value);
-    parse_param(name, value, parms);
-  }
-  /* Close file */
-  fclose(fp);
+  pmap.pass_entries_to_legacy_parse_param(fn);
 
-  // Parse overriding args from command line
-  for (int i = 0; i < argc; ++i) {
-    char name[MAXLEN], value[MAXLEN];
-    s = strtok(argv[i], "=");
-    if (s == NULL) {
-      continue;
-    } else {
-      strncpy(name, s, MAXLEN);
-    }
-    s = strtok(NULL, "=");
-    if (s == NULL) {
-      continue;
-    } else {
-      strncpy(value, s, MAXLEN);
-    }
-    parse_param(name, value, parms);
-    chprintf("Override with %s=%s\n", name, value);
-  }
+  // the plan is to eventually, use the new parsing functions from Parse_Param like the following
+  Init_Param_Struct_Members(pmap, parms);
+
+  pmap.warn_unused_parameters(optionalParams);
+
+  // it may be useful to return pmap in the future so that we can use it to initialize individual modules
 }
 
-/*! \fn void parse_param(char *name,char *value, struct parameters *parms);
- *  \brief Parses and sets a single param based on name and value. */
-void parse_param(char *name, char *value, struct parameters *parms)
+/*! \fn void Parse_Param(char *name,char *value, struct Parameters *parms);
+ *  \brief Parses and sets a single param based on name and value.
+ *
+ *  \returns true if the parameter was actually used. false otherwise.
+ */
+bool Old_Style_Parse_Param(const char *name, const char *value, struct Parameters *parms)
 {
   /* Copy into correct entry in parameters struct */
-  if (strcmp(name, "nx") == 0) {
-    parms->nx = atoi(value);
-  } else if (strcmp(name, "ny") == 0) {
-    parms->ny = atoi(value);
-  } else if (strcmp(name, "nz") == 0) {
-    parms->nz = atoi(value);
-  } else if (strcmp(name, "tout") == 0) {
-    parms->tout = atof(value);
-  } else if (strcmp(name, "outstep") == 0) {
-    parms->outstep = atof(value);
-  } else if (strcmp(name, "n_steps_output") == 0) {
-    parms->n_steps_output = atoi(value);
-  } else if (strcmp(name, "gamma") == 0) {
-    parms->gamma = atof(value);
-  } else if (strcmp(name, "init") == 0) {
+  if (strcmp(name, "init") == 0) {
     strncpy(parms->init, value, MAXLEN);
   } else if (strcmp(name, "nfile") == 0) {
     parms->nfile = atoi(value);
@@ -249,6 +184,8 @@ void parse_param(char *name, char *value, struct parameters *parms)
   } else if (strcmp(name, "out_float32_GasEnergy") == 0) {
     parms->out_float32_GasEnergy = atoi(value);
 #endif  // DE
+  } else if (strcmp(name, "output_always") == 0) {
+    parms->output_always = atoi(value);
 #ifdef MHD
   } else if (strcmp(name, "out_float32_magnetic_x") == 0) {
     parms->out_float32_magnetic_x = atoi(value);
@@ -257,6 +194,20 @@ void parse_param(char *name, char *value, struct parameters *parms)
   } else if (strcmp(name, "out_float32_magnetic_z") == 0) {
     parms->out_float32_magnetic_z = atoi(value);
 #endif  // MHD
+  } else if (strcmp(name, "output_always") == 0) {
+    int tmp = atoi(value);
+    // In this case the CHOLLA_ASSERT macro runs into issuse with the readability-simplify-boolean-expr clang-tidy check
+    // due to some weird macro expansion stuff. That check has been disabled here for now but in clang-tidy 18 the
+    // IgnoreMacro option should be used instead.
+    // NOLINTNEXTLINE(readability-simplify-boolean-expr)
+    CHOLLA_ASSERT((tmp == 0) or (tmp == 1), "output_always must be 1 or 0.");
+    parms->output_always = tmp;
+  } else if (strcmp(name, "legacy_flat_outdir") == 0) {
+    int tmp = atoi(value);
+    CHOLLA_ASSERT((tmp == 0) or (tmp == 1), "legacy_flat_outdir must be 1 or 0.");
+    parms->legacy_flat_outdir = tmp;
+  } else if (strcmp(name, "n_steps_limit") == 0) {
+    parms->n_steps_limit = atof(value);
   } else if (strcmp(name, "xmin") == 0) {
     parms->xmin = atof(value);
   } else if (strcmp(name, "ymin") == 0) {
@@ -371,9 +322,15 @@ void parse_param(char *name, char *value, struct parameters *parms)
   } else if (strcmp(name, "prng_seed") == 0) {
     parms->prng_seed = atoi(value);
 #endif  // PARTICLES
-#ifdef SUPERNOVA
+#ifdef FEEDBACK
+  #ifndef NO_SN_FEEDBACK
   } else if (strcmp(name, "snr_filename") == 0) {
     strncpy(parms->snr_filename, value, MAXLEN);
+  #endif
+  #ifndef NO_WIND_FEEDBACK
+  } else if (strcmp(name, "sw_filename") == 0) {
+    strncpy(parms->sw_filename, value, MAXLEN);
+  #endif
 #endif
 #ifdef ROTATED_PROJECTION
   } else if (strcmp(name, "nxr") == 0) {
@@ -412,6 +369,12 @@ void parse_param(char *name, char *value, struct parameters *parms)
     parms->Omega_L = atof(value);
   } else if (strcmp(name, "Omega_b") == 0) {
     parms->Omega_b = atof(value);
+  } else if (strcmp(name, "Omega_R") == 0) {
+    parms->Omega_R = atof(value);
+  } else if (strcmp(name, "w0") == 0) {
+    parms->w0 = atof(value);
+  } else if (strcmp(name, "wa") == 0) {
+    parms->wa = atof(value);
 #endif  // COSMOLOGY
 #ifdef TILED_INITIAL_CONDITIONS
   } else if (strcmp(name, "tile_length") == 0) {
@@ -451,7 +414,60 @@ void parse_param(char *name, char *value, struct parameters *parms)
     strncpy(parms->skewersdir, value, MAXLEN);
   #endif
 #endif
-  } else if (!is_param_valid(name)) {
-    chprintf("WARNING: %s/%s: Unknown parameter/value pair!\n", name, value);
+#ifdef SCALAR
+  #ifdef DUST
+  } else if (strcmp(name, "grain_radius") == 0) {
+    parms->grain_radius = atoi(value);
+  #endif
+#endif
+  } else {
+    return false;
   }
+  return true;
+}
+
+/*! \brief Parses and sets a bunch of members of parms from pmap.
+ *
+ *  The goal is eventually get rid of the old-style function
+ */
+void Init_Param_Struct_Members(ParameterMap &pmap, struct Parameters *parms)
+{
+  // load the domain dimensions (abort with an error if one of these is missing)
+  parms->nx = pmap.value<int>("nx");
+  parms->ny = pmap.value<int>("ny");
+  parms->nz = pmap.value<int>("nz");
+  CHOLLA_ASSERT((parms->nx >= 0) and (parms->ny >= 0) and (parms->nz >= 0), "domain dimensions must be positive");
+
+#ifdef STATIC_GRAV
+  parms->custom_grav = pmap.value_or("custom_grav", 0);
+#endif
+
+  parms->tout = pmap.value<double>("tout");  // aborts if missing
+  CHOLLA_ASSERT(parms->tout >= 0.0, "tout parameter must be non-negative");
+
+  parms->outstep        = pmap.value<double>("outstep");  // aborts if missing
+  parms->n_steps_output = pmap.value_or("n_steps_output", 0);
+
+  // in the future, maybe we should provide a default value of 5/3 for gamma
+  parms->gamma = Real(pmap.value<double>("gamma"));
+  CHOLLA_ASSERT(parms->gamma > 1.0, "gamma parameter must be greater than one.");
+
+#ifdef TEMPERATURE_FLOOR
+  if (not pmap.has_param("temperature_floor")) {
+    chprintf("WARNING: parameter file doesn't include temperature_floor parameter. Defaulting to value of 0!\n");
+  }
+  parms->temperature_floor = pmap.value_or("temperature_floor", 0.0);
+#endif
+#ifdef DENSITY_FLOOR
+  if (not pmap.has_param("density_floor")) {
+    chprintf("WARNING: parameter file doesn't include density_floor parameter. Defaulting to value of 0!\n");
+  }
+  parms->density_floor = pmap.value_or("density_floor", 0.0);
+#endif
+#ifdef SCALAR_FLOOR
+  if (not pmap.has_param("scalar_floor")) {
+    chprintf("WARNING: parameter file doesn't include scalar_floor parameter. Defaulting to value of 0!\n");
+  }
+  parms->scalar_floor = pmap.value_or("scalar_floor", 0.0);
+#endif
 }

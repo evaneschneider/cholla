@@ -6,11 +6,6 @@
 
 #include "../grid/grid_enum.h"  // defines NSCALARS
 
-#ifdef COOLING_CPU
-  #include <gsl/gsl_spline.h>
-  #include <gsl/gsl_spline2d.h>
-#endif
-
 #ifdef PARTICLES
   #include <cstdint>
 #endif  // PARTICLES
@@ -46,6 +41,7 @@ typedef double Real;
 #define LENGTH_UNIT         3.08567758e21  // 1 kpc in cm
 #define MASS_UNIT           1.98847e33     // 1 solar mass in grams
 #define DENSITY_UNIT        (MASS_UNIT / (LENGTH_UNIT * LENGTH_UNIT * LENGTH_UNIT))
+#define FORCE_UNIT          (MASS_UNIT * LENGTH_UNIT / TIME_UNIT / TIME_UNIT)
 #define VELOCITY_UNIT       (LENGTH_UNIT / TIME_UNIT)
 #define ENERGY_UNIT         (DENSITY_UNIT * VELOCITY_UNIT * VELOCITY_UNIT)
 #define PRESSURE_UNIT       (DENSITY_UNIT * VELOCITY_UNIT * VELOCITY_UNIT)
@@ -55,13 +51,35 @@ typedef double Real;
 #define LOG_FILE_NAME "run_output.log"
 
 // Conserved Floor Values
-#define TEMP_FLOOR 1e-3
-#define DENS_FLOOR 1e-5  // in code units
+#if (defined(FEEDBACK) || defined(STAR_FORMATION)) && defined(CLOUDY_COOL)
+  #define TEMP_FLOOR 1e1    // 10K for cloudy cooling
+  #define DENS_FLOOR 14.83  // 1e-6 cm^-3
+#else
+  #define TEMP_FLOOR 1e-3
+  #define DENS_FLOOR 1e-5  // in code units
+#endif
 
-// Parameter for Enzo dual Energy Condition
-#define DE_ETA_1 \
-  0.001  // Ratio of U to E for which  Internal Energy is used to compute the
-         // Pressure
+// mean molecular weight
+#define MU 0.6
+// Parameters for Enzo dual Energy Condition
+// - Prior to GH PR #356, DE_ETA_1 nominally had a value of 0.001 in all
+//   simulations (in practice, the value of DE_ETA_1 had minimal significance
+//   in those simulations). In PR #356, we revised the internal-energy
+//   synchronization to account for the value of DE_ETA_1. This was necessary
+//   for non-cosmology simulations.
+// - In Cosmological simulation, we set DE_ETA_1 to a large number (it doesn't
+//   really matter what, as long as its >=1) to maintain the older behavior
+// - In the future, we run tests and revisit the choice of DE_ETA_1 in
+//   cosmological simulations
+#ifdef COSMOLOGY
+  #define DE_ETA_1 10.0
+#else
+  #define DE_ETA_1 \
+    0.001  // Ratio of U to E for which  Internal Energy is used to compute the
+           // Pressure. This also affects when the Internal Energy is used for
+           // the update.
+#endif
+
 #define DE_ETA_2 \
   0.035  // Ratio of U to max(E_local) used to select which Internal Energy is
          // used for the update.
@@ -143,14 +161,6 @@ extern Real C_cfl;  // CFL number (0 - 0.5)
 extern Real t_comm;
 extern Real t_other;
 
-#ifdef COOLING_CPU
-extern gsl_interp_accel *acc;
-extern gsl_interp_accel *xacc;
-extern gsl_interp_accel *yacc;
-extern gsl_spline *highT_C_spline;
-extern gsl_spline2d *lowT_C_spline;
-extern gsl_spline2d *lowT_H_spline;
-#endif
 #ifdef COOLING_GPU
 extern float *cooling_table;
 extern float *heating_table;
@@ -160,21 +170,29 @@ extern float *heating_table;
  *  \brief Set gamma values for Riemann solver. */
 extern void Set_Gammas(Real gamma_in);
 
-/*! \fn double get_time(void)
+/*! \fn double Get_Time(void)
  *  \brief Returns the current clock time. */
-extern double get_time(void);
+extern double Get_Time(void);
 
 /*! \fn int sgn
  *  \brief Mathematical sign function. Returns sign of x. */
-extern int sgn(Real x);
+extern int Sgn(Real x);
 
-#ifndef CUDA
-/*! \fn Real calc_eta(Real cW[], Real gamma)
- *  \brief Calculate the eta value for the H correction. */
-extern Real calc_eta(Real cW[], Real gamma);
-#endif
+/* Global variables for mpi (but they are also initialized to sensible defaults when not using mpi)
+ *
+ * It may make sense to move these back into mpi_routines (but reorganizing the ifdef statements
+ * would take some work). It may make sense to also put these into their own namespace.
+ */
+extern int procID; /*process rank*/
+extern int nproc;  /*number of processes executing simulation*/
+extern int root;   /*rank of root process*/
 
-struct parameters {
+/* Used when MPI_CHOLLA is not defined to initialize a subset of the global mpi-related variables
+ * that still meaningful in non-mpi simulations.
+ */
+void Init_Global_Parallel_Vars_No_MPI();
+
+struct Parameters {
   int nx;
   int ny;
   int nz;
@@ -184,11 +202,11 @@ struct parameters {
   Real gamma;
   char init[MAXLEN];
   int nfile;
-  int n_hydro;
-  int n_particle;
-  int n_projection;
-  int n_rotated_projection;
-  int n_slice;
+  int n_hydro                = 1;
+  int n_particle             = 1;
+  int n_projection           = 1;
+  int n_rotated_projection   = 1;
+  int n_slice                = 1;
   int n_out_float32          = 0;
   int out_float32_density    = 0;
   int out_float32_momentum_x = 0;
@@ -197,6 +215,12 @@ struct parameters {
   int out_float32_Energy     = 0;
 #ifdef DE
   int out_float32_GasEnergy = 0;
+#endif
+  bool output_always      = false;
+  bool legacy_flat_outdir = false;
+  int n_steps_limit       = -1;  // Note that negative values indicate that there is no limit
+#ifdef STATIC_GRAV
+  int custom_grav = 0;  // flag to set specific static gravity field
 #endif
 #ifdef MHD
   int out_float32_magnetic_x = 0;
@@ -271,31 +295,42 @@ struct parameters {
   // machine dependent seed will be generated.
   std::uint_fast64_t prng_seed = 0;
 #endif  // PARTICLES
-#ifdef SUPERNOVA
+#ifdef FEEDBACK
+  #ifndef NO_SN_FEEDBACK
   char snr_filename[MAXLEN];
+  #endif
+  #ifndef NO_WIND_FEEDBACK
+  char sw_filename[MAXLEN];
+  #endif
 #endif
 #ifdef ROTATED_PROJECTION
+  // initialize rotation parameters to zero
   int nxr;
   int nzr;
-  Real delta;
-  Real theta;
-  Real phi;
+  Real delta = 0;
+  Real theta = 0;
+  Real phi   = 0;
   Real Lx;
   Real Lz;
-  int n_delta;
-  Real ddelta_dt;
-  int flag_delta;
+  int n_delta    = 0;
+  Real ddelta_dt = 0;
+  int flag_delta = 0;
 #endif /*ROTATED_PROJECTION*/
 #ifdef COSMOLOGY
   Real H0;
   Real Omega_M;
   Real Omega_L;
   Real Omega_b;
+  Real Omega_R;
+  Real w0;
+  Real wa;
   Real Init_redshift;
   Real End_redshift;
-  char scale_outputs_file[MAXLEN];  // File for the scale_factor output values
-                                    // for cosmological simulations
-#endif                              // COSMOLOGY
+
+  // File for the scale_factor output values for cosmological simulations
+  char scale_outputs_file[MAXLEN];
+  #define EXPANSION_HISTORY_FILE_NAME "expansion_history.txt"
+#endif  // COSMOLOGY
 #ifdef TILED_INITIAL_CONDITIONS
   Real tile_length;
 #endif  // TILED_INITIAL_CONDITIONS
@@ -311,6 +346,9 @@ struct parameters {
   char UVB_rates_file[MAXLEN];  // File for the UVB photoheating and
                                 // photoionization rates of HI, HeI and HeII
 #endif
+  Real temperature_floor = 0;
+  Real density_floor     = 0;
+  Real scalar_floor      = 0;
 #ifdef ANALYSIS
   char analysis_scale_outputs_file[MAXLEN];  // File for the scale_factor output
                                              // values for cosmological
@@ -322,15 +360,20 @@ struct parameters {
   char skewersdir[MAXLEN];
   #endif
 #endif
+#ifdef SCALAR
+  #ifdef DUST
+  Real grain_radius;
+  #endif
+#endif
 };
 
-/*! \fn void parse_params(char *param_file, struct parameters * parms);
+/*! \fn void parse_params(char *param_file, struct Parameters * parms);
  *  \brief Reads the parameters in the given file into a structure. */
-extern void parse_params(char *param_file, struct parameters *parms, int argc, char **argv);
+extern void Parse_Params(char *param_file, struct Parameters *parms, int argc, char **argv);
 
 /*! \fn int is_param_valid(char *name);
  * \brief Verifies that a param is valid (even if not needed).  Avoids
  * "warnings" in output. */
-extern int is_param_valid(const char *name);
+extern int Is_Param_Valid(const char *name);
 
 #endif  // GLOBAL_H

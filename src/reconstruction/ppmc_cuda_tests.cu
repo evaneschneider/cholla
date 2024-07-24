@@ -87,10 +87,22 @@ TEST(tHYDROPpmcCTUReconstructor, CorrectInputExpectCorrectOutput)
     cuda_utilities::DeviceVector<double> dev_interface_right(host_grid.size(), true);
 
     // Launch kernel
-    hipLaunchKernelGGL(PPMC_CTU, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
-                       dev_interface_right.data(), nx, ny, nz, dx, dt, gamma, direction);
-    CudaCheckError();
-    CHECK(cudaDeviceSynchronize());
+    switch (direction) {
+      case 0:
+        hipLaunchKernelGGL(PPMC_CTU<0>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, dx, dt, gamma);
+        break;
+      case 1:
+        hipLaunchKernelGGL(PPMC_CTU<1>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, dx, dt, gamma);
+        break;
+      case 2:
+        hipLaunchKernelGGL(PPMC_CTU<2>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, dx, dt, gamma);
+        break;
+    }
+    GPU_Error_Check();
+    GPU_Error_Check(cudaDeviceSynchronize());
 
     // Perform Comparison
     for (size_t i = 0; i < host_grid.size(); i++) {
@@ -101,7 +113,7 @@ TEST(tHYDROPpmcCTUReconstructor, CorrectInputExpectCorrectOutput)
               ? 0.0
               : fiducial_interface_left.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "left interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
 
@@ -111,7 +123,7 @@ TEST(tHYDROPpmcCTUReconstructor, CorrectInputExpectCorrectOutput)
                          ? 0.0
                          : fiducial_interface_right.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "right interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
     }
@@ -139,7 +151,7 @@ TEST(tALLPpmcVLReconstructor, CorrectInputExpectCorrectOutput)
 #ifdef MHD
   size_t const n_fields = 8;
 #else   // not MHD
-  size_t const n_fields                                                = 5;
+  size_t const n_fields = 5;
 #endif  // MHD
 
   // Setup host grid. Fill host grid with random values and randomly assign maximum value
@@ -227,10 +239,22 @@ TEST(tALLPpmcVLReconstructor, CorrectInputExpectCorrectOutput)
     cuda_utilities::DeviceVector<double> dev_interface_right(nx * ny * nz * (n_fields - 1), true);
 
     // Launch kernel
-    hipLaunchKernelGGL(PPMC_VL, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
-                       dev_interface_right.data(), nx, ny, nz, gamma, direction);
-    CudaCheckError();
-    CHECK(cudaDeviceSynchronize());
+    switch (direction) {
+      case 0:
+        hipLaunchKernelGGL(PPMC_VL<0>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, gamma);
+        break;
+      case 1:
+        hipLaunchKernelGGL(PPMC_VL<1>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, gamma);
+        break;
+      case 2:
+        hipLaunchKernelGGL(PPMC_VL<2>, dev_grid.size(), 1, 0, 0, dev_grid.data(), dev_interface_left.data(),
+                           dev_interface_right.data(), nx, ny, nz, gamma);
+        break;
+    }
+    GPU_Error_Check();
+    GPU_Error_Check(cudaDeviceSynchronize());
 
     // Perform Comparison
     for (size_t i = 0; i < dev_interface_left.size(); i++) {
@@ -241,7 +265,7 @@ TEST(tALLPpmcVLReconstructor, CorrectInputExpectCorrectOutput)
               ? 0.0
               : fiducial_interface_left.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "left interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
 
@@ -251,7 +275,7 @@ TEST(tALLPpmcVLReconstructor, CorrectInputExpectCorrectOutput)
                          ? 0.0
                          : fiducial_interface_right.at(direction)[i];
 
-      testingUtilities::checkResults(
+      testing_utilities::Check_Results(
           fiducial_val, test_val,
           "right interface at i=" + std::to_string(i) + ", in direction " + std::to_string(direction));
     }

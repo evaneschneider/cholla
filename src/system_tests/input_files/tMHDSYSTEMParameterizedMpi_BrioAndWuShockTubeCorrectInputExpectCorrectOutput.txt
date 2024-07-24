@@ -53,7 +53,7 @@ By_l=1.0
 Bz_l=0.0
 
 # density of right state
-rho_r=0.128
+rho_r=0.125
 # velocity of right state
 vx_r=0
 vy_r=0

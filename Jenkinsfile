@@ -29,7 +29,7 @@ pipeline
                     axis
                     {
                         name 'CHOLLA_MAKE_TYPE'
-                        values 'hydro', 'gravity', 'disk', 'particles', 'cosmology', 'mhd', 'dust'
+                        values 'hydro', 'gravity', 'disk', 'particles', 'cosmology', 'mhd', 'dust', 'cooling'
                     }
                 }
 
@@ -73,12 +73,15 @@ pipeline
                     {
                         steps
                         {
-                            sh  '''
-                                source builds/run_tests.sh
-                                setupTests -c gcc -t ${CHOLLA_MAKE_TYPE}
+                            retry(2)
+                            {
+                                sh  '''
+                                    source builds/run_tests.sh
+                                    setupTests -c gcc -t ${CHOLLA_MAKE_TYPE}
 
-                                runTests
-                                '''
+                                    runTests
+                                    '''
+                            }
                         }
                     }
                     stage('Run Clang Tidy')
@@ -90,7 +93,7 @@ pipeline
                                     source builds/run_tests.sh
                                     setupTests -c gcc -t ${CHOLLA_MAKE_TYPE}
 
-                                    module load clang/15.0.2
+                                    module load clang/17.0.1
                                     make tidy CLANG_TIDY_ARGS="--warnings-as-errors=*" TYPE=${CHOLLA_MAKE_TYPE}
                                     '''
                             }

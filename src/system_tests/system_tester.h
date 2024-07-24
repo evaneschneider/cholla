@@ -21,7 +21,7 @@
  * \brief This namespace contains one class, SystemTestRunner, whose
  * purpose is to (as you might expect) run system tests.
  */
-namespace systemTest
+namespace system_test
 {
 /*!
  * \brief Runs a system test using the full test name to determine all
@@ -49,9 +49,9 @@ namespace systemTest
  *
  */
 class SystemTestRunner;
-}  // namespace systemTest
+}  // namespace system_test
 
-class systemTest::SystemTestRunner
+class system_test::SystemTestRunner
 {
  public:
   /// The number of MPI ranks, defaults to 1
@@ -62,7 +62,7 @@ class systemTest::SystemTestRunner
    * replacing the need for a settings file. A string of the launch parameters
    * that will override the values in the settings file (if given). Any of
    * Cholla's standard launch paramters work except `outdir` as that is
-   * reserved for usage in the systemTest::SystemTestRunner.runTest() method
+   * reserved for usage in the system_test::SystemTestRunner.runTest() method
    */
   std::string chollaLaunchParams;
 
@@ -111,7 +111,7 @@ class systemTest::SystemTestRunner
    *
    * \return double The L2Norm of the last run test
    */
-  double getL2Norm() { return _L2Norm; };
+  double getL2Norm() { return L2Norm_; };
 
   /*!
    * \brief Get the Output Directory object
@@ -261,9 +261,10 @@ class systemTest::SystemTestRunner
    * `true` then the settings file is automatically found based on the naming
    * convention. If false then the user MUST provide all the required settings
    * with the SystemTestRunner::chollaLaunchParams member variable
+   * \param[in] gravityData Is there gravity data?
    */
   SystemTestRunner(bool const &particleData = false, bool const &hydroData = true, bool const &useFiducialFile = true,
-                   bool const &useSettingsFile = true);
+                   bool const &useSettingsFile = true, bool const &gravityData = false);
   ~SystemTestRunner();
 
  private:
@@ -273,6 +274,8 @@ class systemTest::SystemTestRunner
   std::vector<H5::H5File> _testHydroFieldsFileVec;
   /// The test particle data files
   std::vector<H5::H5File> _testParticlesFileVec;
+  /// The test gravity data files
+  std::vector<H5::H5File> _testGravityFileVec;
 
   /// The path to the Cholla executable
   std::string _chollaPath;
@@ -312,7 +315,7 @@ class systemTest::SystemTestRunner
   double _fixedEpsilon = 5.0E-12;
 
   /// The L2 norm of the error vector
-  double _L2Norm;
+  double L2Norm_;
 
   /// Flag to indicate if a fiducial HDF5 data file is being used or a
   /// programmatically generated H5File object. `true` = use a file, `false` =
@@ -331,6 +334,12 @@ class systemTest::SystemTestRunner
   /// to fiducial values. If false then it is assumed that the test produces
   /// no particle data
   bool _particleDataExists = false;
+
+  /// Flag to indicate whether or not there is gravity data
+  /// If true then gravity data files are searched for and will be compared
+  /// to fiducial values. If false then it is assumed that the test produces
+  /// no gravity data
+  bool _gravityDataExists = false;
 
   /*!
    * \brief Using GTest assertions to check if the fiducial and test data have
@@ -359,6 +368,8 @@ class systemTest::SystemTestRunner
    */
   std::vector<double> _loadFiducialFieldData(std::string const &dataSetName);
 
+  std::vector<double> _loadGravityPotential(H5::H5File const &data_file);
+
   /*!
    * \brief Load the fiducial data for particles from the HDF5 file or return
    * the user set vector. Field data is handeled with _loadFiducialFieldData
@@ -375,4 +386,4 @@ class systemTest::SystemTestRunner
    * \return std::vector<std::string>
    */
   std::vector<std::string> _findDataSetNames(H5::H5File const &inputFile);
-};  // End of class systemTest::SystemTestRunner
+};  // End of class system_test::SystemTestRunner

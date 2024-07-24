@@ -18,7 +18,6 @@
 #include "../integrators/simple_3D_cuda.h"
 #include "../io/io.h"
 #include "../utils/error_handling.h"
-#include "../utils/ran.h"
 #ifdef MPI_CHOLLA
   #include <mpi.h>
   #ifdef HDF5
@@ -54,18 +53,12 @@ Grid3D::Grid3D(void)
 #ifdef PCM
   H.n_ghost = 2;
 #endif  // PCM
-#ifdef PLMP
+#if defined(PLMP) or defined(PLMC)
   H.n_ghost = 3;
-#endif  // PLMP
-#ifdef PLMC
-  H.n_ghost = 3;
-#endif  // PLMC
-#ifdef PPMP
+#endif  // PLMP or PLMC
+#if defined(PPMP) or defined(PPMC)
   H.n_ghost = 4;
-#endif  // PPMP
-#ifdef PPMC
-  H.n_ghost = 4;
-#endif  // PPMC
+#endif  // PPMP or PLMC
 
 #ifdef GRAVITY
   H.n_ghost_potential_offset = H.n_ghost - N_GHOST_POTENTIAL;
@@ -79,7 +72,7 @@ Grid3D::Grid3D(void)
 
 /*! \fn void Get_Position(long i, long j, long k, Real *xpos, Real *ypos, Real
  * *zpos) \brief Get the cell-centered position based on cell index */
-void Grid3D::Get_Position(long i, long j, long k, Real *x_pos, Real *y_pos, Real *z_pos)
+void Grid3D::Get_Position(long i, long j, long k, Real *x_pos, Real *y_pos, Real *z_pos) const
 {
 #ifndef MPI_CHOLLA
 
@@ -122,7 +115,7 @@ Real Grid3D::Calc_Inverse_Timestep()
 
 /*! \fn void Initialize(int nx_in, int ny_in, int nz_in)
  *  \brief Initialize the grid. */
-void Grid3D::Initialize(struct parameters *P)
+void Grid3D::Initialize(struct Parameters *P)
 {
   // number of fields to track (default 5 is # of conserved variables)
   H.n_fields = 5;
@@ -146,6 +139,13 @@ void Grid3D::Initialize(struct parameters *P)
   int nx_in = P->nx;
   int ny_in = P->ny;
   int nz_in = P->nz;
+
+#ifdef STATIC_GRAV
+  H.custom_grav = P->custom_grav;  // Initialize the custom static gravity flag
+  if (H.custom_grav == 0) {
+    printf("WARNING: No custom gravity field given. Gravity field will be set to zero.\n");
+  }
+#endif
 
   // Set the CFL coefficient (a global variable)
   C_cfl = 0.3;
@@ -252,20 +252,26 @@ void Grid3D::Initialize(struct parameters *P)
 #endif /*ROTATED_PROJECTION*/
 
 // Values for lower limit for density and temperature
-#ifdef DENSITY_FLOOR
-  H.density_floor = DENS_FLOOR;
-#else
-  H.density_floor     = 0.0;
+#ifdef TEMPERATURE_FLOOR
+  H.temperature_floor = P->temperature_floor;
 #endif
 
-#ifdef TEMPERATURE_FLOOR
-  H.temperature_floor = TEMP_FLOOR;
-#else
-  H.temperature_floor = 0.0;
+#ifdef DENSITY_FLOOR
+  H.density_floor = P->density_floor;
+#endif
+
+#ifdef SCALAR_FLOOR
+  H.scalar_floor = P->scalar_floor;
 #endif
 
 #ifdef COSMOLOGY
-  H.OUTPUT_SCALE_FACOR = not P->scale_outputs_file[0] == '\0';
+  H.OUTPUT_SCALE_FACOR = not(P->scale_outputs_file[0] == '\0');
+#endif
+
+#ifdef SCALAR
+  #ifdef DUST
+  H.grain_radius = P->grain_radius;
+  #endif
 #endif
 
   H.Output_Initial = true;
@@ -277,7 +283,7 @@ void Grid3D::AllocateMemory(void)
 {
   // allocate memory for the conserved variable arrays
   // allocate all the memory to density, to insure contiguous memory
-  CudaSafeCall(cudaHostAlloc((void **)&C.host, H.n_fields * H.n_cells * sizeof(Real), cudaHostAllocDefault));
+  GPU_Error_Check(cudaHostAlloc((void **)&C.host, H.n_fields * H.n_cells * sizeof(Real), cudaHostAllocDefault));
 
   // point conserved variables to the appropriate locations
   C.density    = &(C.host[grid_enum::density * H.n_cells]);
@@ -304,7 +310,7 @@ void Grid3D::AllocateMemory(void)
 #endif  // DE
 
   // allocate memory for the conserved variable arrays on the device
-  CudaSafeCall(cudaMalloc((void **)&C.device, H.n_fields * H.n_cells * sizeof(Real)));
+  GPU_Error_Check(cudaMalloc((void **)&C.device, H.n_fields * H.n_cells * sizeof(Real)));
   cuda_utilities::initGpuMemory(C.device, H.n_fields * H.n_cells * sizeof(Real));
   C.d_density    = C.device;
   C.d_momentum_x = &(C.device[H.n_cells]);
@@ -330,11 +336,11 @@ void Grid3D::AllocateMemory(void)
 #endif  // DE
 
 #if defined(GRAVITY)
-  CudaSafeCall(cudaHostAlloc(&C.Grav_potential, H.n_cells * sizeof(Real), cudaHostAllocDefault));
-  CudaSafeCall(cudaMalloc((void **)&C.d_Grav_potential, H.n_cells * sizeof(Real)));
+  GPU_Error_Check(cudaHostAlloc(&C.Grav_potential, H.n_cells * sizeof(Real), cudaHostAllocDefault));
+  GPU_Error_Check(cudaMalloc((void **)&C.d_Grav_potential, H.n_cells * sizeof(Real)));
 #else
-  C.Grav_potential    = NULL;
-  C.d_Grav_potential  = NULL;
+  C.Grav_potential   = NULL;
+  C.d_Grav_potential = NULL;
 #endif
 
 #ifdef CHEMISTRY_GPU
@@ -396,9 +402,9 @@ void Grid3D::set_dt(Real dti)
 #endif
 }
 
-/*! \fn void Update_Grid(void)
- *  \brief Update the conserved quantities in each cell. */
-Real Grid3D::Update_Grid(void)
+/*! \fn void Execute_Hydro_Integratore_Grid(void)
+ *  \brief Updates cells by executing the hydro integrator. */
+void Grid3D::Execute_Hydro_Integrator(void)
 {
   Real max_dti = 0;
   int x_off, y_off, z_off;
@@ -412,16 +418,6 @@ Real Grid3D::Update_Grid(void)
   z_off = nz_local_start;
 #endif
 
-  // Set the lower limit for density and temperature (Internal Energy)
-  Real U_floor, density_floor;
-  density_floor = H.density_floor;
-  // Minimum of internal energy from minumum of temperature
-  U_floor = H.temperature_floor * KB / (gama - 1) / MP / SP_ENERGY_UNIT;
-#ifdef COSMOLOGY
-  U_floor = H.temperature_floor / (gama - 1) / MP * KB * 1e-10;  // ( km/s )^2
-  U_floor /= Cosmo.v_0_gas * Cosmo.v_0_gas / Cosmo.current_a / Cosmo.current_a;
-#endif
-
 #ifdef CPU_TIME
   Timer.Hydro_Integrator.Start();
 #endif  // CPU_TIME
@@ -429,87 +425,115 @@ Real Grid3D::Update_Grid(void)
   // Run the hydro integrator on the grid
   if (H.nx > 1 && H.ny == 1 && H.nz == 1)  // 1D
   {
-#ifdef CUDA
-  #ifdef VL
-    VL_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields);
-  #endif  // VL
-  #ifdef SIMPLE
-    Simple_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields);
-  #endif                                         // SIMPLE
-#endif                                           // CUDA
+#ifdef VL
+    VL_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields, H.custom_grav);
+#endif  // VL
+#ifdef SIMPLE
+    Simple_Algorithm_1D_CUDA(C.device, H.nx, x_off, H.n_ghost, H.dx, H.xbound, H.dt, H.n_fields, H.custom_grav);
+#endif                                           // SIMPLE
   } else if (H.nx > 1 && H.ny > 1 && H.nz == 1)  // 2D
   {
-#ifdef CUDA
-  #ifdef VL
+#ifdef VL
     VL_Algorithm_2D_CUDA(C.device, H.nx, H.ny, x_off, y_off, H.n_ghost, H.dx, H.dy, H.xbound, H.ybound, H.dt,
-                         H.n_fields);
-  #endif  // VL
-  #ifdef SIMPLE
+                         H.n_fields, H.custom_grav);
+#endif  // VL
+#ifdef SIMPLE
     Simple_Algorithm_2D_CUDA(C.device, H.nx, H.ny, x_off, y_off, H.n_ghost, H.dx, H.dy, H.xbound, H.ybound, H.dt,
-                             H.n_fields);
-  #endif                                        // SIMPLE
-#endif                                          // CUDA
+                             H.n_fields, H.custom_grav);
+#endif                                          // SIMPLE
   } else if (H.nx > 1 && H.ny > 1 && H.nz > 1)  // 3D
   {
-#ifdef CUDA
-  #ifdef VL
+#ifdef VL
     VL_Algorithm_3D_CUDA(C.device, C.d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy,
-                         H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, density_floor, U_floor,
+                         H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, H.custom_grav, H.density_floor,
                          C.Grav_potential);
-  #endif  // VL
-  #ifdef SIMPLE
+#endif  // VL
+#ifdef SIMPLE
     Simple_Algorithm_3D_CUDA(C.device, C.d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy,
-                             H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, density_floor, U_floor,
+                             H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, H.custom_grav, H.density_floor,
                              C.Grav_potential);
-  #endif  // SIMPLE
-#endif
+#endif  // SIMPLE
   } else {
     chprintf("Error: Grid dimensions nx: %d  ny: %d  nz: %d  not supported.\n", H.nx, H.ny, H.nz);
     chexit(-1);
   }
 
 #ifdef CPU_TIME
-  Timer.Hydro_Integrator.End();
+  Timer.Hydro_Integrator.End(true);
+#endif  // CPU_TIME
+}
+
+/*! \fn void Update_Hydro_Grid(void)
+ *  \brief Do all steps to update the hydro. */
+Real Grid3D::Update_Hydro_Grid()
+{
+#ifdef ONLY_PARTICLES
+  // Don't integrate the Hydro when only solving for particles
+  return 1e-10;
+#endif  // ONLY_PARTICLES
+
+#ifdef CPU_TIME
+  Timer.Hydro.Start();
+  double non_hydro_elapsed_time = 0.0;
 #endif  // CPU_TIME
 
-#ifdef CUDA
+#ifdef GRAVITY
+  // Extrapolate gravitational potential for hydro step
+  Extrapolate_Grav_Potential();
+#endif  // GRAVITY
 
-  #ifdef COOLING_GPU
-    #ifdef CPU_TIME
+  Execute_Hydro_Integrator();
+
+#ifdef TEMPERATURE_FLOOR
+  // Set the lower limit temperature (Internal Energy)
+  Real U_floor;
+  // Minimum of internal energy from minumum of temperature
+  U_floor = H.temperature_floor * KB / (gama - 1) / MP / SP_ENERGY_UNIT;
+  #ifdef COSMOLOGY
+  U_floor = H.temperature_floor / (gama - 1) / MP * KB * 1e-10;  // ( km/s )^2
+  U_floor /= Cosmo.v_0_gas * Cosmo.v_0_gas / Cosmo.current_a / Cosmo.current_a;
+  #endif
+  Apply_Temperature_Floor(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, U_floor);
+#endif  // TEMPERATURE_FLOOR
+
+#ifdef SCALAR_FLOOR
+  #ifdef DUST
+  Apply_Scalar_Floor(C.device, H.nx, H.ny, H.nz, H.n_ghost, grid_enum::dust_density, H.scalar_floor);
+  #endif
+#endif  // SCALAR_FLOOR
+
+// == Perform chemistry/cooling (there are a few different cases) ==
+#ifdef COOLING_GPU
+  #ifdef CPU_TIME
   Timer.Cooling_GPU.Start();
-    #endif
+  #endif
   // ==Apply Cooling from cooling/cooling_cuda.h==
   Cooling_Update(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dt, gama);
-    #ifdef CPU_TIME
+  #ifdef CPU_TIME
   Timer.Cooling_GPU.End();
-    #endif
-
-  #endif  // COOLING_GPU
-
-  #ifdef DUST
-  // ==Apply dust from dust/dust_cuda.h==
-  Dust_Update(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dt, gama);
-  #endif  // DUST
-
-  // Update the H and He ionization fractions and apply cooling and photoheating
-  #ifdef CHEMISTRY_GPU
-  Update_Chemistry();
-    #ifdef CPU_TIME
-  Timer.Chemistry.RecordTime(Chem.H.runtime_chemistry_step);
-    #endif
   #endif
 
-  #ifdef AVERAGE_SLOW_CELLS
-  // Set the min_delta_t for averaging a slow cell
-  Real max_dti_slow;
-  max_dti_slow = 1 / H.min_dt_slow;
-  Average_Slow_Cells(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dx, H.dy, H.dz, gama, max_dti_slow);
-  #endif  // AVERAGE_SLOW_CELLS
+#endif  // COOLING_GPU
 
-  // ==Calculate the next time step using Calc_dt_GPU from hydro/hydro_cuda.h==
-  max_dti = Calc_Inverse_Timestep();
+#ifdef DUST
+  // ==Apply dust from dust/dust_cuda.h==
+  Dust_Update(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dt, gama, H.grain_radius);
+#endif  // DUST
 
-#endif  // CUDA
+#ifdef CHEMISTRY_GPU
+  // Update the H and He ionization fractions and apply cooling and photoheating
+  Update_Chemistry();
+  #ifdef CPU_TIME
+  Timer.Chemistry.RecordTime(Chem.H.runtime_chemistry_step);
+  non_hydro_elapsed_time += Chem.H.runtime_chemistry_step;
+  #endif
+  C.HI_density    = &C.host[H.n_cells * grid_enum::HI_density];
+  C.HII_density   = &C.host[H.n_cells * grid_enum::HII_density];
+  C.HeI_density   = &C.host[H.n_cells * grid_enum::HeI_density];
+  C.HeII_density  = &C.host[H.n_cells * grid_enum::HeII_density];
+  C.HeIII_density = &C.host[H.n_cells * grid_enum::HeIII_density];
+  C.e_density     = &C.host[H.n_cells * grid_enum::e_density];
+#endif
 
 #ifdef COOLING_GRACKLE
   Cool.fields.density       = C.density;
@@ -523,59 +547,48 @@ Real Grid3D::Update_Grid(void)
   #ifdef GRACKLE_METALS
   Cool.fields.metal_density = &C.host[H.n_cells * grid_enum::metal_density];
   #endif
-#endif
 
-#ifdef CHEMISTRY_GPU
-  C.HI_density    = &C.host[H.n_cells * grid_enum::HI_density];
-  C.HII_density   = &C.host[H.n_cells * grid_enum::HII_density];
-  C.HeI_density   = &C.host[H.n_cells * grid_enum::HeI_density];
-  C.HeII_density  = &C.host[H.n_cells * grid_enum::HeII_density];
-  C.HeIII_density = &C.host[H.n_cells * grid_enum::HeIII_density];
-  C.e_density     = &C.host[H.n_cells * grid_enum::e_density];
-#endif
-
-  return max_dti;
-}
-
-/*! \fn void Update_Hydro_Grid(void)
- *  \brief Do all steps to update the hydro. */
-Real Grid3D::Update_Hydro_Grid()
-{
-#ifdef ONLY_PARTICLES
-  // Don't integrate the Hydro when only solving for particles
-  return 1e-10;
-#endif  // ONLY_PARTICLES
-
-  Real dti;
-
-#ifdef CPU_TIME
-  Timer.Hydro.Start();
-#endif  // CPU_TIME
-
-#ifdef GRAVITY
-  // Extrapolate gravitational potential for hydro step
-  Extrapolate_Grav_Potential();
-#endif  // GRAVITY
-
-  dti = Update_Grid();
-
-#ifdef CPU_TIME
-  #ifdef CHEMISTRY_GPU
-  Timer.Hydro.Subtract(Chem.H.runtime_chemistry_step);
-  // Subtract the time spent on the Chemical Update
-  #endif  // CHEMISTRY_GPU
-  Timer.Hydro.End();
-#endif  // CPU_TIME
-
-#ifdef COOLING_GRACKLE
   #ifdef CPU_TIME
-  Timer.Cooling_Grackle.Start();
+  double cur_grackle_timing = Get_Time();
   #endif  // CPU_TIME
   Do_Cooling_Step_Grackle();
   #ifdef CPU_TIME
-  Timer.Cooling_Grackle.End();
+  double cur_grackle_timing = Get_Time() - cur_grackle_timing;
+  Timer.Cooling_Grackle.RecordTime(cur_grackle_timing);
+  non_hydro_elapsed_time += cur_grackle_timing;
   #endif  // CPU_TIME
 #endif    // COOLING_GRACKLE
+
+  // Temperature Ceiling
+#ifdef TEMPERATURE_CEILING
+  // 1e51 ergs / (m_p * (pc/cm)^3) = 45000 km/s
+  // sqrt(1e10 K * kB/ m_mp) = 9000 km/s
+  const Real T_ceiling_kelvin = 1e9;  // match CGOLS (roughly where cooling function cuts off);
+  Temperature_Ceiling(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, gama, T_ceiling_kelvin);
+#endif  // TEMPERATURE_CEILING
+
+  // == average slow cells and compute the new timestep ==
+#ifdef AVERAGE_SLOW_CELLS
+  // Set the min_delta_t for averaging a slow cell
+  Real max_dti_slow;
+  max_dti_slow = 1 / H.min_dt_slow;
+  int nx_off = 0, ny_off = 0, nz_off = 0;
+  #ifdef MPI_CHOLLA
+  nx_off = nx_local_start;  // offsets
+  ny_off = ny_local_start;
+  nz_off = nz_local_start;
+  #endif
+  Average_Slow_Cells(C.device, H.nx, H.ny, H.nz, H.n_ghost, H.n_fields, H.dx, H.dy, H.dz, gama, max_dti_slow, H.xbound,
+                     H.ybound, H.zbound, nx_off, ny_off, nz_off);
+#endif  // AVERAGE_SLOW_CELLS
+
+  // ==Calculate the next time step using Calc_dt_GPU from hydro/hydro_cuda.h==
+  Real dti = Calc_Inverse_Timestep();
+
+#ifdef CPU_TIME
+  Timer.Hydro.Subtract(non_hydro_elapsed_time);
+  Timer.Hydro.End();
+#endif  // CPU_TIME
 
   return dti;
 }
@@ -618,11 +631,11 @@ void Grid3D::Reset(void)
 void Grid3D::FreeMemory(void)
 {
   // free the conserved variable arrays
-  CudaSafeCall(cudaFreeHost(C.host));
+  GPU_Error_Check(cudaFreeHost(C.host));
 
 #ifdef GRAVITY
-  CudaSafeCall(cudaFreeHost(C.Grav_potential));
-  CudaSafeCall(cudaFree(C.d_Grav_potential));
+  GPU_Error_Check(cudaFreeHost(C.Grav_potential));
+  GPU_Error_Check(cudaFree(C.d_Grav_potential));
 #endif
 
 // If memory is single allocated, free the memory at the end of the simulation.

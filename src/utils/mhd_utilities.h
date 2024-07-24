@@ -16,8 +16,10 @@
 #include "../global/global.h"
 #include "../global/global_cuda.h"
 #include "../grid/grid3D.h"
+#include "../utils/basic_structs.h"
 #include "../utils/cuda_utilities.h"
 #include "../utils/gpu.hpp"
+#include "../utils/math_utilities.h"
 
 namespace mhd::utils
 {
@@ -27,7 +29,7 @@ namespace mhd::utils
  * but is made accesible for testing
  *
  */
-namespace _internal
+namespace internal
 {
 // =====================================================================
 /*!
@@ -60,7 +62,7 @@ inline __host__ __device__ Real _magnetosonicSpeed(Real const &density, Real con
   return sqrt((term1 + waveChoice * term2) / (2.0 * fmax(density, TINY_NUMBER)));
 }
 // =====================================================================
-}  // namespace _internal
+}  // namespace internal
 
 // =========================================================================
 /*!
@@ -74,7 +76,7 @@ inline __host__ __device__ Real _magnetosonicSpeed(Real const &density, Real con
 inline __host__ __device__ Real computeMagneticEnergy(Real const &magneticX, Real const &magneticY,
                                                       Real const &magneticZ)
 {
-  return 0.5 * (magneticX * magneticX + ((magneticY * magneticY) + (magneticZ * magneticZ)));
+  return 0.5 * math_utils::SquareMagnitude(magneticX, magneticY, magneticZ);
 }
 // =========================================================================
 
@@ -98,9 +100,7 @@ inline __host__ __device__ Real computeThermalEnergy(Real const &energyTot, Real
                                                      Real const &magneticX, Real const &magneticY,
                                                      Real const &magneticZ, Real const &gamma)
 {
-  return energyTot -
-         0.5 * (momentumX * momentumX + ((momentumY * momentumY) + (momentumZ * momentumZ))) /
-             fmax(density, TINY_NUMBER) -
+  return energyTot - 0.5 * math_utils::SquareMagnitude(momentumX, momentumY, momentumZ) / fmax(density, TINY_NUMBER) -
          computeMagneticEnergy(magneticX, magneticY, magneticZ);
 }
 // =========================================================================
@@ -123,6 +123,12 @@ inline __host__ __device__ Real computeTotalPressure(Real const &gasPressure, Re
 
   return fmax(pTot, TINY_NUMBER);
 }
+/// Overload for Vector objects
+inline __host__ __device__ Real computeTotalPressure(Real const &gasPressure,
+                                                     hydro_utilities::VectorXYZ const &magnetic)
+{
+  return computeTotalPressure(gasPressure, magnetic.x(), magnetic.y(), magnetic.z());
+}
 // =========================================================================
 
 // =========================================================================
@@ -141,7 +147,7 @@ inline __host__ __device__ Real fastMagnetosonicSpeed(Real const &density, Real 
                                                       Real const &magneticY, Real const &magneticZ, Real const &gamma)
 {
   // Compute the sound speed
-  return mhd::utils::_internal::_magnetosonicSpeed(density, pressure, magneticX, magneticY, magneticZ, gamma, 1.0);
+  return mhd::utils::internal::_magnetosonicSpeed(density, pressure, magneticX, magneticY, magneticZ, gamma, 1.0);
 }
 // =========================================================================
 
@@ -161,7 +167,7 @@ inline __host__ __device__ Real slowMagnetosonicSpeed(Real const &density, Real 
                                                       Real const &magneticY, Real const &magneticZ, Real const &gamma)
 {
   // Compute the sound speed
-  return mhd::utils::_internal::_magnetosonicSpeed(density, pressure, magneticX, magneticY, magneticZ, gamma, -1.0);
+  return mhd::utils::internal::_magnetosonicSpeed(density, pressure, magneticX, magneticY, magneticZ, gamma, -1.0);
 }
 // =========================================================================
 
@@ -199,13 +205,15 @@ inline __host__ __device__ Real alfvenSpeed(Real const &magneticX, Real const &d
  * \param[out] avgBy The cell centered average magnetic field in the y-direction
  * \param[out] avgBz The cell centered average magnetic field in the z-direction
  *
- * \return Real local struct with the X, Y, and Z cell centered magnetic
- * fields. Intended to be called with structured binding like `auto [x, y,
+ * \return hydro_utilities::VectorXYZ with the X, Y, and Z cell centered magnetic
+ * fields. Can be called with structured binding like `auto [x, y,
  * z] = mhd::utils::cellCenteredMagneticFields(*args*)
  */
-inline __host__ __device__ auto cellCenteredMagneticFields(Real const *dev_conserved, size_t const &id,
-                                                           size_t const &xid, size_t const &yid, size_t const &zid,
-                                                           size_t const &n_cells, size_t const &nx, size_t const &ny)
+inline __host__ __device__ hydro_utilities::VectorXYZ cellCenteredMagneticFields(Real const *dev_conserved,
+                                                                                 size_t const &id, size_t const &xid,
+                                                                                 size_t const &yid, size_t const &zid,
+                                                                                 size_t const &n_cells,
+                                                                                 size_t const &nx, size_t const &ny)
 {
   // Ternary operator to check that no values outside of the magnetic field
   // arrays are loaded. If the cell is on the edge that doesn't have magnetic
@@ -230,10 +238,7 @@ inline __host__ __device__ auto cellCenteredMagneticFields(Real const *dev_conse
                          :
                          /*if false*/ dev_conserved[(grid_enum::magnetic_z)*n_cells + id];
 
-  struct returnStruct {
-    Real x, y, z;
-  };
-  return returnStruct{avgBx, avgBy, avgBz};
+  return {avgBx, avgBy, avgBz};
 }
 // =========================================================================
 

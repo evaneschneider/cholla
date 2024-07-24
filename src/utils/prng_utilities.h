@@ -11,9 +11,9 @@
 class ChollaPrngGenerator
 {
  public:
-  std::mt19937_64 inline static generator;
+  static std::mt19937_64 generator;
 
-  ChollaPrngGenerator(struct parameters *P)
+  ChollaPrngGenerator(struct Parameters *P)
   {
     // If the seed isn't defined in the settings file or argv then generate
     // a random seed
