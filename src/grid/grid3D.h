@@ -10,6 +10,8 @@
 
 #include <stdio.h>
 
+#include <functional>
+
 #include "../global/global.h"
 #include "../global/global_cuda.h"
 
@@ -210,9 +212,10 @@ struct Header {
    *  \brief Length of the current timestep */
   Real dt;
 
-#ifdef AVERAGE_SLOW_CELLS
+  /*! \brief Cells that introduce timesteps shorter than will be averaged with
+   *         neighboring cells. Should be a negative value when the
+   *         AVERAGE_SLOW_CELLS macro isn't defined. */
   Real min_dt_slow;
-#endif
 
   /*! \var t_wall
    *  \brief Wall time */
@@ -463,8 +466,13 @@ class Grid3D
   void Execute_Hydro_Integrator(void);
 
   /*! \fn void Update_Hydro_Grid(void)
-   *  \brief Do all steps to update the hydro. */
-  Real Update_Hydro_Grid(void);
+   *  \brief Do all steps to update the hydro.
+   *
+   *  \param chemistry_callback is a crude way to optionally provide a cooling
+   *  function that is invoked after the hydro-integrator. At the moment,
+   *  this does not support chemistry.
+   */
+  Real Update_Hydro_Grid(std::function<void(Grid3D &)> &chemistry_callback);
 
   void Update_Time();
   /*! \fn void Write_Header_Text(FILE *fp)
@@ -845,13 +853,13 @@ class Grid3D
   void Advance_Particles_KDK_Step2_GPU();
   void Set_Particles_Boundary_GPU(int dir, int side);
   void Set_Particles_Density_Boundaries_Periodic_GPU(int direction, int side);
+  int Load_Particles_Density_Boundary_to_Buffer_GPU(int direction, int side, Real *buffer);
+  void Unload_Particles_Density_Boundary_From_Buffer_GPU(int direction, int side, Real *buffer);
   #endif  // PARTICLES_GPU
   #ifdef GRAVITY_GPU
   void Copy_Potential_From_GPU();
   void Copy_Particles_Density_to_GPU();
   void Copy_Particles_Density_GPU();
-  int Load_Particles_Density_Boundary_to_Buffer_GPU(int direction, int side, Real *buffer);
-  void Unload_Particles_Density_Boundary_From_Buffer_GPU(int direction, int side, Real *buffer);
   #endif  // GRAVITY_GPU
 #endif    // PARTICLES
 
