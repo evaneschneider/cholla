@@ -5,3 +5,41 @@ This page briefly describes parameters that may be defined in the input file. Al
 :::{todo}
 Port me [from the wiki](https://github.com/cholla-hydro/cholla/wiki/Input-File-Parameters)
 :::
+
+## Required Parameters
+
+These parameters are required for all simulations
+
+:::{include} param/Required.md
+:::
+
+## Cosmology
+
+The parameters required when compiled with `COSMOLOGY` are {par:param}`H0`, {par:param}`Omega_M`, {par:param}`Omega_L`, and {par:param}`Omega_b`.
+
+:::{include} param/Cosmology.md
+:::
+
+## Chemistry
+
+These parameters should all be specified in the `[chemistry]` parameter table.
+
+:::{include} param/Chemistry.md
+:::
+
+(Reference-Feedback-Runtime-Params)=
+## Feedback
+
+These parameters should all be specified in the `[feedback]` parameter table.
+
+:::{include} param/Feedback.md
+:::
+
+
+## Gravity
+
+These parameters should all be specified in the `[gravity]` parameter table.
+
+:::{include} param/Gravity.md
+:::
+

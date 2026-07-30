@@ -15,6 +15,7 @@
 #include "global/global.h"
 #include "grid/grid3D.h"
 #include "io/ParameterMap.h"
+#include "io/WriterManager.h"
 #include "io/io.h"
 #include "utils/cuda_utilities.h"
 #include "utils/error_handling.h"
@@ -60,7 +61,6 @@ int main(int argc, char *argv[])
 
   // input parameter variables
   char *param_file;
-  struct Parameters P;
   int nfile    = 0;  // number of output files
   Real outtime = 0;  // current output time
 
@@ -80,9 +80,15 @@ int main(int argc, char *argv[])
   // read in contents from the parameter file
   ParameterMap pmap(param_file, argc, argv);
 
-  // use this parameter information to populate the Parameter object
-  Parse_Params(pmap, &P);
-  // and output to screen
+  // construct P, a `Parameters` instance, using information from pmap
+  // - `Parameters` is a legacy type that we're phasing out (see docstring for details)
+  // - a highlevel description of the legacy/modern control flows:
+  //   -> legacy: parameter vals are copied from pmap into P, and subsequent code
+  //              initializes the simulation using parameter values from P
+  //   -> modern: code initializes the simulation by getting values directly from pmap
+  Parameters P(pmap);
+
+  // write a description of simulation configuration to console
   chprintf("Git Commit Hash = %s\n", GIT_HASH);
   chprintf("Macro Flags     = %s\n", MACRO_FLAGS);
   chprintf(
@@ -98,10 +104,14 @@ int main(int argc, char *argv[])
     is_restart = true;
   }
 
+  // Create the Writer Manager, which is in charge of calling of trigger the various
+  // functions that dump data (e.g. snapshots, slices, projections)
+  io::WriterManager writer_manager(P, pmap, G.field_info);
+
   if (is_restart) {
     chprintf("Input directory:  %s\n", P.indir);
   }
-  chprintf("Output directory:  %s\n", P.outdir);
+  chprintf("Output directory:  %s\n", writer_manager.fname_template().nominal_output_dir_path().c_str());
 
   // Check the configuration
   Check_Configuration(P);
@@ -123,7 +133,7 @@ int main(int argc, char *argv[])
 
   // Set initial conditions
   chprintf("Setting initial conditions...\n");
-  G.Set_Initial_Conditions(P);
+  G.Set_Initial_Conditions(P, pmap);
   chprintf("Initial conditions set.\n");
   // set main variables for Read_Grid and Read_Grid_Cat initial conditions
   if (is_restart) {
@@ -172,14 +182,11 @@ int main(int argc, char *argv[])
   }
 #endif
 
+  std::function<void(Grid3D &)> feedback_callback;
+
 #if defined(FEEDBACK) && defined(PARTICLE_AGE)
   FeedbackAnalysis sn_analysis(G, &P);
-  #ifndef NO_SN_FEEDBACK
-  feedback::Init_State(&P);
-  #endif  // NO_SN_FEEDBACK
-  #ifndef NO_WIND_FEEDBACK
-  feedback::Init_Wind_State(&P);
-  #endif
+  feedback_callback = feedback::configure_feedback_callback(P, pmap, sn_analysis);
 #endif  // FEEDBACK && PARTICLE_AGE
 
 #ifdef STAR_FORMATION
@@ -223,7 +230,7 @@ int main(int argc, char *argv[])
   if (!is_restart || G.H.Output_Now) {
     // write the initial conditions to file
     chprintf("Writing initial conditions to file...\n");
-    Write_Data(G, P, nfile);
+    Write_Data(G, P, nfile, writer_manager);
   }
   // add one to the output file count
   nfile++;
@@ -274,10 +281,6 @@ int main(int argc, char *argv[])
       G.H.dt = next_scheduled_time - G.H.t;
     }
 
-#if defined(FEEDBACK) && defined(PARTICLE_AGE)
-    feedback::Cluster_Feedback(G, sn_analysis);
-#endif  // FEEDBACK && PARTICLE_AGE
-
 #ifdef PARTICLES
     // Advance the particles KDK( first step ): Velocities are updated by 0.5*dt
     // and positions are updated by dt
@@ -287,7 +290,7 @@ int main(int argc, char *argv[])
 #endif
 
     // Advance the grid by one timestep
-    dti = G.Update_Hydro_Grid(chemistry_callback);
+    dti = G.Update_Hydro_Grid(feedback_callback, chemistry_callback);
 
     // update the simulation time ( t += dt )
     G.Update_Time();
@@ -353,7 +356,7 @@ int main(int argc, char *argv[])
     if (G.H.t == outtime || G.H.Output_Now) {
 #ifdef OUTPUT
       /*output the grid data*/
-      Write_Data(G, P, nfile);
+      Write_Data(G, P, nfile, writer_manager);
       // add one to the output file count
       nfile++;
 #endif  // OUTPUT
@@ -369,7 +372,7 @@ int main(int argc, char *argv[])
     // Exit the loop when reached the limit number of steps (optional)
     if (G.H.n_step >= P.n_steps_limit and P.n_steps_limit > 0) {
 #ifdef OUTPUT
-      Write_Data(G, P, nfile);
+      Write_Data(G, P, nfile, writer_manager);
 #endif  // OUTPUT
       break;
     }

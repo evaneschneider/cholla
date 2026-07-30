@@ -5,6 +5,7 @@
 
 #include "../global/global.h"
 #include "../grid/spatial_domain_props.h"
+#include "../io/FnameTemplate.h"
 
 #ifdef SOR
   #include "../gravity/potential_SOR_3D.h"
@@ -129,9 +130,10 @@ class Grav3D
      * grid at the previous time step */
     Real *potential_1_h;
 
-#ifdef GRAVITY_ANALYTIC_COMP
+    /*! \var analyic_potential_h
+     *  \brief Array containing the gravitational potential of each from the static, analytic potential.
+     */
     Real *analytic_potential_h;
-#endif
 
 #ifdef GRAVITY_GPU
 
@@ -149,9 +151,10 @@ class Grav3D
      * in the grid at the previous time step */
     Real *potential_1_d;
 
-  #ifdef GRAVITY_ANALYTIC_COMP
+    /*! \var analyic_potential_h
+     *  \brief Device Array containing the gravitational potential of each from the static, analytic potential.
+     */
     Real *analytic_potential_d;
-  #endif
 
 #endif  // GRAVITY_GPU
 
@@ -200,7 +203,7 @@ class Grav3D
   void FreeMemory_CPU(void);
 
   void Read_Restart_HDF5(struct Parameters *P, int nfile);
-  void Write_Restart_HDF5(struct Parameters *P, int nfile);
+  void Write_Restart_HDF5(struct Parameters *P, int nfile, const FnameTemplate &fname_template);
 
   Real Get_Average_Density();
   Real Get_Average_Density_function(int g_start, int g_end);

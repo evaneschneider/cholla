@@ -7,6 +7,7 @@
   #include <hdf5.h>
 #endif
 #include "../global/global.h"
+#include "../grid/field_info.h"
 #include "../grid/grid3D.h"
 #include "../grid/grid_enum.h"       // provides grid_enum
 #include "../hydro/average_cells.h"  // provides Average_Slow_Cells and SlowCellConditionChecker
@@ -39,7 +40,7 @@
 
 /*! \fn Grid3D(void)
  *  \brief Constructor for the Grid. */
-Grid3D::Grid3D(void)
+Grid3D::Grid3D(void) : field_info(FieldInfo::create())
 {
   // set initialization flag to 0
   flag_init = 0;
@@ -112,24 +113,7 @@ Real Grid3D::Calc_Inverse_Timestep()
  *  \brief Initialize the grid. */
 void Grid3D::Initialize(struct Parameters *P)
 {
-  // number of fields to track (default 5 is # of conserved variables)
-  H.n_fields = 5;
-
-// if including passive scalars increase the number of fields
-#ifdef SCALAR
-  H.n_fields += NSCALARS;
-#endif
-
-// if including magnetic fields increase the number of fields
-#ifdef MHD
-  H.n_fields += 3;
-#endif  // MHD
-
-// if using dual energy formalism must track internal energy - always the last
-// field!
-#ifdef DE
-  H.n_fields++;
-#endif
+  H.n_fields = field_info.n_fields();
 
   int nx_in = P->nx;
   int ny_in = P->ny;
@@ -141,6 +125,8 @@ void Grid3D::Initialize(struct Parameters *P)
     printf("WARNING: No custom gravity field given. Gravity field will be set to zero.\n");
   }
 #endif
+
+  H.gas_only_use_static_grav = P->gas_only_use_static_grav;
 
   // Set the CFL coefficient (a global variable)
   C_cfl = 0.3;
@@ -212,41 +198,6 @@ void Grid3D::Initialize(struct Parameters *P)
 
   // allocate memory
   AllocateMemory();
-
-#ifdef ROTATED_PROJECTION
-  // x-dir pixels in projection
-  R.nx = P->nxr;
-  // z-dir pixels in projection
-  R.nz = P->nzr;
-  // minimum x location to project
-  R.nx_min = 0;
-  // minimum z location to project
-  R.nz_min = 0;
-  // maximum x location to project
-  R.nx_max = R.nx;
-  // maximum z location to project
-  R.nz_max = R.nz;
-  // rotation angle about z direction
-  R.delta = M_PI * (P->delta / 180.);  // convert to radians
-  // rotation angle about x direction
-  R.theta = M_PI * (P->theta / 180.);  // convert to radians
-  // rotation angle about y direction
-  R.phi = M_PI * (P->phi / 180.);  // convert to radians
-  // x-dir physical size of projection
-  R.Lx = P->Lx;
-  // z-dir physical size of projection
-  R.Lz = P->Lz;
-  // initialize a counter for rotated outputs
-  R.i_delta = 0;
-  // number of rotated outputs in a complete revolution
-  R.n_delta = P->n_delta;
-  // rate of rotation between outputs, for an actual simulation
-  R.ddelta_dt = P->ddelta_dt;
-  // are we not rotating about z(0)?
-  // are we outputting multiple rotations(1)? or rotating during a
-  // simulation(2)?
-  R.flag_delta = P->flag_delta;
-#endif /*ROTATED_PROJECTION*/
 
 // Values for lower limit for density and temperature
 #ifdef TEMPERATURE_FLOOR
@@ -415,6 +366,24 @@ void Grid3D::Execute_Hydro_Integrator(void)
   Timer.Hydro_Integrator.Start();
 #endif  // CPU_TIME
 
+  [[maybe_unused]] Real *d_Grav_potential = nullptr;
+  if (H.gas_only_use_static_grav) {
+    // this supports a crude-workaround for when we run cholla with
+    // - particles that are influenced by their own self-gravity, the gravity of the gas, and a static
+    //   analytic potential
+    // - AND we only want the gas to be influenced by the static analytic poential
+    //
+    // Be aware, STATIC_GRAV won't directly use this pointer (in fact, when STATIC_GRAV is defined, this
+    // pointer should be NULL). We should probably refactor to unify STATIC_GRAV and GRAVITY
+#ifdef GRAVITY
+    d_Grav_potential = Grav.F.analytic_potential_d;
+#else
+    CHOLLA_ERROR("this should be unreachable when GRAVITY isn't defined");
+#endif
+  } else {
+    d_Grav_potential = C.d_Grav_potential;
+  }
+
   // this buffer holds 1 element that is initialized to 0
   cuda_utilities::DeviceVector<int> error_code_buffer(1, true);
 
@@ -440,13 +409,13 @@ void Grid3D::Execute_Hydro_Integrator(void)
   } else if (H.nx > 1 && H.ny > 1 && H.nz > 1)  // 3D
   {
 #ifdef VL
-    VL_Algorithm_3D_CUDA(C.device, C.d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy,
-                         H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, H.custom_grav, H.density_floor,
+    VL_Algorithm_3D_CUDA(C.device, d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy, H.dz,
+                         H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, H.custom_grav, H.density_floor,
                          C.Grav_potential, SlowCellConditionChecker(1.0 / H.min_dt_slow, H.dx, H.dy, H.dz),
                          error_code_buffer.data());
 #endif  // VL
 #ifdef SIMPLE
-    Simple_Algorithm_3D_CUDA(C.device, C.d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy,
+    Simple_Algorithm_3D_CUDA(C.device, d_Grav_potential, H.nx, H.ny, H.nz, x_off, y_off, z_off, H.n_ghost, H.dx, H.dy,
                              H.dz, H.xbound, H.ybound, H.zbound, H.dt, H.n_fields, H.custom_grav, H.density_floor,
                              C.Grav_potential, SlowCellConditionChecker(1.0 / H.min_dt_slow, H.dx, H.dy, H.dz),
                              error_code_buffer.data());
@@ -465,7 +434,8 @@ void Grid3D::Execute_Hydro_Integrator(void)
 #endif  // CPU_TIME
 }
 
-Real Grid3D::Update_Hydro_Grid(std::function<void(Grid3D &)> &chemistry_callback)
+Real Grid3D::Update_Hydro_Grid(std::function<void(Grid3D &)> &feedback_callback,
+                               std::function<void(Grid3D &)> &chemistry_callback)
 {
 #ifdef ONLY_PARTICLES
   // Don't integrate the Hydro when only solving for particles
@@ -482,7 +452,12 @@ Real Grid3D::Update_Hydro_Grid(std::function<void(Grid3D &)> &chemistry_callback
   Extrapolate_Grav_Potential();
 #endif  // GRAVITY
 
+  // Evolve the hydrodynamical quantities
   Execute_Hydro_Integrator();
+
+  // apply the floors
+  // ================
+  // -> we need do this before we handle source terms because it is necessary for chemistry/cooling
 
 #ifdef TEMPERATURE_FLOOR
   // Set the lower limit temperature (Internal Energy)
@@ -501,6 +476,12 @@ Real Grid3D::Update_Hydro_Grid(std::function<void(Grid3D &)> &chemistry_callback
   Apply_Scalar_Floor(C.device, H.nx, H.ny, H.nz, H.n_ghost, grid_enum::dust_density, H.scalar_floor);
   #endif
 #endif  // SCALAR_FLOOR
+
+  // apply source terms
+  // ==================
+  if (feedback_callback) {
+    feedback_callback(*this);
+  }
 
   // == Perform chemistry/cooling (there are a few different cases) ==
 
@@ -564,6 +545,11 @@ Real Grid3D::Update_Hydro_Grid(std::function<void(Grid3D &)> &chemistry_callback
   non_hydro_elapsed_time += cur_grackle_timing;
   #endif  // CPU_TIME
 #endif    // COOLING_GRACKLE
+
+  // Finally, it is time to handle calculation of the timestep for the next cycle
+  // ============================================================================
+  // -> first, we perform certain modifications to the fields that are partially
+  //    motivated by the impact that they have on the size of the timestep
 
   // Temperature Ceiling
 #ifdef TEMPERATURE_CEILING
